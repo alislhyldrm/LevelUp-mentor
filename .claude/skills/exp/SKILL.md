@@ -53,7 +53,11 @@ Push etmeden önce `python tools/kx.py board` — kota ve eşzamanlı koşu limi
    Tamam: `EXP_SUMMARY.md`'ye satır düştü.
 
 7. **Karşılaştır.** `python tools/kx.py cmp EXP-0xx`
-   Çıktı: ana skor farkı, fold fold farklar, fold farklarının standart sapması, öneri.
+   Çıktı: ana skor farkı, **diğer skor farkı** (bilgi amaçlı, otomatik öneriyi etkilemez),
+   fold fold farklar, fold farklarının standart sapması, öneri.
+   `cv_mean` ve `cv_oof` zıt yöne işaret ederse araç UYARI basar — bu durumda otomatik
+   öneriyi olduğu gibi almadan **ikisine de bak**, card.md'ye hangisinin neden tercih
+   edildiğini yaz.
    Karar kuralı `CLAUDE.md`'de. **"BELİRSİZ" yok.** KABUL / HAVUZ / RED.
    CV'de beklenmedik büyük sıçrama varsa önce sızıntı araştır.
    Tamam: öneri insana sunuldu, kararı insan verdi.

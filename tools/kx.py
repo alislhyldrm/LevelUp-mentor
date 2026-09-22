@@ -353,6 +353,23 @@ def validate_output(exp_id: str, out: Path) -> list[str]:
     for field in ("exp_id", "cv_mean", "cv_oof", "fold_scores", "n_folds_done"):
         if field not in result:
             errs.append(f"result.json: '{field}' alani yok")
+
+    # Skorlar sonlu olmali. Provada olculdu: sklearn roc_auc_score tek sinifli bir
+    # dilimde hata vermez, NAN doner. Kucuk FAST fold'lari veya nadir sinif dilimleri
+    # boyle bir skoru sessizce kayda sokabilir.
+    def _finite(v) -> bool:
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) != float("inf")
+
+    for field in ("cv_mean", "cv_oof"):
+        if field in result and not _finite(result[field]):
+            errs.append(f"result.json: {field}={result[field]!r} sonlu bir sayi degil (nan/inf?)")
+    scores = result.get("fold_scores")
+    if isinstance(scores, list):
+        bad = [i for i, v in enumerate(scores) if not _finite(v)]
+        if bad:
+            errs.append(f"result.json: fold_scores {bad} sonlu degil - o fold'da tek sinif veya bos dilim var")
+    elif "fold_scores" in result:
+        errs.append("result.json: 'fold_scores' liste degil")
     if result.get("exp_id") not in (None, exp_id):
         errs.append(f"result.json exp_id '{result.get('exp_id')}' klasor {exp_id} ile uyusmuyor")
     if is_full and expected_folds is not None and result.get("n_folds_done") not in (None, expected_folds):
@@ -431,6 +448,7 @@ def cmd_cmp(args, cfg) -> None:
               "FAST sonuclari yalniz FAST ile karsilastirilir.")
 
     key = cfg.get("main_score", "cv_mean")
+    other_key = "cv_oof" if key == "cv_mean" else "cv_mean"
     gib = bool(cfg.get("greater_is_better", True))
     cs, ps = child.get(key), parent.get(key)
     if cs is None or ps is None:
@@ -444,6 +462,19 @@ def cmd_cmp(args, cfg) -> None:
     print(f"  {exp_id}: {cs}")
     print(f"  {parent_id}: {ps}")
     print(f"  fark: {main_diff:+.6f}")
+
+    # Diger skor bilgi amacli her zaman gosterilir; secilmedi diye kaybolmaz.
+    # Iki skor zit yone isaret ediyorsa (biri iyilesme, digeri kotulesme derse)
+    # otomatik oneri bunu gormez - insan burada uyarilir.
+    co, po = child.get(other_key), parent.get(other_key)
+    if co is not None and po is not None:
+        other_diff = (co - po) * sign
+        print(f"  ({other_key}: {exp_id}={co}  {parent_id}={po}  fark={other_diff:+.6f})")
+        if main_diff != 0 and other_diff != 0 and (main_diff > 0) != (other_diff > 0):
+            print(f"\n  UYARI: {key} ve {other_key} ZIT yone isaret ediyor "
+                  f"({key} {'iyilesme' if main_diff>0 else 'kotulesme'}, "
+                  f"{other_key} {'iyilesme' if other_diff>0 else 'kotulesme'}). "
+                  "Otomatik oneri yalniz ana skora bakar - karari vermeden once ikisine de bak.")
 
     suggestion = "kanit yetersiz - fold skorlari eksik"
     if len(cf) == len(pf) and cf:
