@@ -35,6 +35,17 @@ Sıralama değişiyorsa ilk submission'lar bu belirsizliği sınamak için kulla
 FAST sonuçları yalnız FAST ile karşılaştırılır. FAST'ta zayıf çıkan fikir kesin elenmiş
 sayılmaz; daha uzun eğitim isteyen fikirler için not düşülür.
 
+## `core/` sözleşmesi
+
+| Dosya | İçerik |
+|---|---|
+| `folds.csv` | `id, fold, y` — satır kimliği, fold numarası, **gerçek hedef**. Notebook fold'u buradan okur, kendisi üretmez; `blend.py` hedefi buradan alır |
+| `metric.py` | `score(y_true, y_pred) -> float` + `GREATER_IS_BETTER`. Tek fonksiyon, tek sabit |
+| `cv_spec.md` | bu dosya |
+
+Bu klasör Kaggle'a **`hackathon-core`** özel dataset'i olarak yüklenir; slug `kx.json`'a yazılır.
+`core/metric.py` şu an ROC AUC şablonudur — `/case` bunu resmi metrikle değiştirir.
+
 ## Çıktı sözleşmesi
 Her koşu `/kaggle/working/` altına yazar:
 
