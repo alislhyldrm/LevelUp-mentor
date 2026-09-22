@@ -32,8 +32,9 @@ kılmak, kapsam riskini erken yakalamak. **Sen resmi çizersin, kararı insan ve
    Kapanış rezervini kalan süreden düş; sığmayan deneyi önerme.
    ŞİMDİ kovasında 3'ten az madde kaldıysa `CODEX.md` Çağrı 4'ü tetikle.
 
-4. **Yaz.** `STATUS.md`'yi yeniden yaz (≤30 satır, en üst satır "insandan sıradaki
-   eylem"). Ayrıca panoya yapıştırılabilir kısa sürümü ver:
+4. **Yaz.** `STATUS.md`'yi yeniden yaz (≤60 satır, en üst satır "insandan sıradaki
+   eylem"). Çürüme kuralı `CLAUDE.md` kural 8'de. Ayrıca panoya yapıştırılabilir
+   kısa sürümü ver:
 
        ## Durum T+<saat> (<gün saat>)
        - Kaggle'da koşan: <slug> - tahmini bitiş <..>
@@ -49,7 +50,13 @@ kılmak, kapsam riskini erken yakalamak. **Sen resmi çizersin, kararı insan ve
 
 ## `/durum devir`
 
-Nöbeti devrederken tura ek olarak 5 satır:
+Nöbeti devrederken tura ek olarak 5 satır üretilir. Bu satırlar panoya
+verilmekle kalmaz, `STATUS.md`'ye kalıcı olarak yazılır:
+- "Ne yapıldı" + "Çalışır durumda mı" → `Bu oturumda ne oldu`
+- "Nerede kaldı" + "Dikkat" → `Nerede kaldım / dikkat`
+- "Sıradaki adım" → `İnsandan sıradaki eylem`
+
+Panoya yapıştırılabilir kısa sürüm:
 
 - Ne yapıldı: <EXP'ler, kararlar>
 - Nerede kaldı: <yarım deney, bekleyen koşu>

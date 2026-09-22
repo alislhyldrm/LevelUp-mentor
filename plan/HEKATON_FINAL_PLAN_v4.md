@@ -21,7 +21,9 @@
 
 1. **Teslim döngüsünü otomatikleştir.** Notebook → Kaggle → çıktı → kayıt zinciri elle dosya taşımadan dönsün.
 2. **Karşılaştırılabilirliği garanti et.** Sabit fold, sabit metrik, sabit çıktı sözleşmesi. Bu olmadan 6 kişinin sonucu birleşmez.
-3. **Tek bir "şu an ne var, sırada ne var" ekranı tut.** `STATUS.md`.
+3. **Tek bir "şu an ne var, sırada ne var" ekranı tut.** `STATUS.md`. Aynı zamanda
+   oturumlar arası devir dosyasıdır — tek sohbette bitmeyen yarış günü boyunca
+   bağlam yalnız bu dosya üzerinden taşınır.
 
 Bu üç işe hizmet etmeyen her dosya kurulmaz.
 
@@ -377,20 +379,48 @@ Kapanmış bir Playground yarışmasında **60–90 dakika**, sadece döngü:
 
 ## 14. STATUS.md şablonu
 
+`STATUS.md` aynı zamanda oturumlar arası devir dosyasıdır: append edilmez, her
+güncellemede yeniden yazılır. Geçmiş üç katmanda zaman bazlı çürür — "Bu
+oturumda ne oldu" (≤8 satır) → "Önceki oturum" (≤5 satır) → "Öncesi" (≤5 satır,
+oturum başına tek satır, taşınca en eskiler birleşir). Ana hat, sabitlenen
+kararlar ve "Denendi, işe yaramadı" çürümez — kaybolursa aynı fikir tekrar
+denenir. Toplam ≤60 satır. Detay zaten kendi log dosyasındaysa buraya
+kopyalanmaz, tek satır + dosya adı yazılır.
+
 ```markdown
-# SAVAŞ PLANI — Cuma 12:00 → Cumartesi 12:00
+# STATUS — <yarışma> | Cuma 12:00 → Cumartesi 12:00
+<!-- Oturum devir dosyası. Yeni oturum önce bunu okur. Append edilmez, yeniden yazılır. -->
 
 ## İnsandan sıradaki eylem
 → <tek satır. Örn: "EXP-008 bitti, çıktı indi; EXP-009'u push etmemi onayla.">
 
 ## Şu an
-Faz: … | Ana hat: EXP-… (ana skor …) | Son kontrol: HH:MM
+Faz: … | Ana hat: EXP-… (ana skor …) | Son güncelleme: <gün HH:MM>
 Kaggle'da koşan: … (tahmini bitiş …) | Kalan GPU kotası: … | Son FULL başlatma saati: …
+Submission: kalan hak … (yenilenme TR 03:00) | En iyi LB: …
 
 ## Sıradaki 3 iş
 1. …  2. …  3. …
 
+## Bu oturumda ne oldu
+- …
+
+## Önceki oturum
+- …
+
+## Öncesi
+- …
+
+## Sabitlenen kararlar
+- … (detay: log/DECISIONS.md)
+
+## Denendi, işe yaramadı
+- … (detay: experiments/EXP_SUMMARY.md)
+
 ## Aktif riskler
+- …
+
+## Nerede kaldım / dikkat
 - …
 
 ## Ürüne taşınabilecek en güçlü 3 bulgu

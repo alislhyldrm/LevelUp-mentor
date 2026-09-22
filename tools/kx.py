@@ -206,7 +206,13 @@ def cmd_new(args, cfg) -> None:
 
     metadata = {
         "id": f"{cfg['username']}/{slug}",
-        "title": f"{slug} {(args.note or exp_id)}"[:50],
+        # BASLIK = SLUG, baska bir sey degil. Kaggle kernel'in GERCEK slug'ini
+        # id alanindan degil, baslikten kendi slugify'iyla turetir; ikisi
+        # uyusmazsa Kaggle sessizce KENDI slug'ini kullanir ve id yoksayilir
+        # (provada yakalandi: not metinli baslik -> beklenmedik slug -> status/
+        # fetch "permission denied" gibi yaniltici hatayla patlar). Hipotez notu
+        # card.md'de zaten var; baslikte tekrar etmeye gerek yok.
+        "title": slug,
         "code_file": "notebook.ipynb",
         "language": "python",
         "kernel_type": "notebook",
@@ -234,12 +240,34 @@ def slug_exists_remotely(slug: str, cfg: dict) -> bool:
     return proc.returncode == 0 and "404" not in out and "not found" not in out
 
 
+def check_notebook_syntax(nb_path: Path) -> None:
+    """Her kod hucresini ast.parse ile denetler - push'tan once, saniyeler icinde.
+    Provada bulundu: bir syntax hatasi Kaggle kuyruguna girip ~5 dk sonra
+    hata olarak dondu. Bunu yerelde yakalamak o turu tamamen ortadan kaldirir."""
+    import ast
+
+    nb = json.loads(nb_path.read_text(encoding="utf-8"))
+    errs = []
+    for i, c in enumerate(nb.get("cells", [])):
+        if c.get("cell_type") != "code":
+            continue
+        src = "".join(c.get("source", []))
+        try:
+            ast.parse(src)
+        except SyntaxError as e:
+            errs.append(f"  hucre {i}, satir {e.lineno}: {e.msg}\n    {(e.text or '').strip()}")
+    if errs:
+        die("notebook.ipynb'de syntax hatasi var, push edilmedi:\n" + "\n".join(errs))
+
+
 def cmd_push(args, cfg) -> None:
     exp_id = normalize_exp(args.exp)
     d = exp_dir(exp_id)
     meta_path = d / "kernel-metadata.json"
     if not meta_path.exists():
         die(f"{exp_id} icin kernel-metadata.json yok. Once `kx.py new`.")
+
+    check_notebook_syntax(d / "notebook.ipynb")
 
     slug = slug_for(exp_id, cfg)
     metadata = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -269,6 +297,20 @@ def cmd_push(args, cfg) -> None:
     print(f"push: {expected_id}  gpu={args.gpu}  internet={args.internet}")
     proc = kaggle("kernels", "push", "-p", str(d), timeout=600)
     print(proc.stdout.strip())
+    if "does not resolve to the specified id" in (proc.stdout + proc.stderr):
+        print(f"UYARI: Kaggle baslik/id uyumsuzlugu bildirdi. Gercek slug '{slug}' olmayabilir.")
+
+    # Push "basarili" desin bile, Kaggle GERCEKTE farkli bir slug uretmis olabilir
+    # (baslik id'ye tam slugify olmuyorsa). Burada dogrulanmazsa hata ilk `fetch`'te,
+    # yanlis dosya beklerken cikar - o zaman teshisi cok daha zor.
+    check = kaggle("kernels", "status", expected_id, check=False, timeout=60)
+    if check.returncode != 0:
+        real = kaggle("kernels", "list", "--mine", "--search", slug, check=False, timeout=60)
+        die(
+            f"push sonrasi '{expected_id}' erisilemiyor - Kaggle farkli bir slug uretmis olabilir.\n"
+            f"  {check.stdout.strip() or check.stderr.strip()}\n"
+            f"  '{slug}' icin bulunanlar:\n  {real.stdout.strip()[:400]}"
+        )
 
     slugs[slug] = exp_id
     save_slugs(slugs)

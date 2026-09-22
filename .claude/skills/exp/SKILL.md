@@ -63,8 +63,11 @@ Push etmeden önce `python tools/kx.py board` — kota ve eşzamanlı koşu limi
    Tamam: öneri insana sunuldu, kararı insan verdi.
 
 8. **Kaydet.** `card.md`'yi doldur (Sonuç, Karar, Ders, Codex incelemesi).
-   `STATUS.md`'yi güncelle — en üst satır her zaman "insandan sıradaki eylem".
-   KABUL ise: ürüne izi tek satır + global istatistikten türeyen feature varsa uyarı notu.
+   `STATUS.md`'yi tam yeniden yazma; yalnız `Şu an`, `Bu oturumda ne oldu` ve
+   `İnsandan sıradaki eylem` bölümlerini güncelle. KABUL ise `Şu an`'daki ana hat
+   satırı da değişir. RED/HAVUZ çıkan deney aynı anda `Denendi, işe yaramadı`'ya
+   tek satır düşer (detay: EXP_SUMMARY.md). KABUL ise: ürüne izi tek satır +
+   global istatistikten türeyen feature varsa uyarı notu.
    Tamam: `card.md`, `EXP_SUMMARY.md`, `STATUS.md` üçü de tutarlı.
 
 ## Sabit kurallar

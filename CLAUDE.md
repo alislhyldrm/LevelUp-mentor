@@ -31,9 +31,13 @@
 5. Hiçbir OOF/test tahmini silinmez. RED çıkanlar da ensemble havuzunda kalır.
 6. CV'de beklenmedik büyük sıçramada önce sızıntı araştırılır.
 7. **Submit etme.** Öner; insan gönderdikten sonra `log/SUBMISSIONS.md`'ye kaydet.
-8. Her kayıttan sonra `STATUS.md`'yi güncelle (≤30 satır). En üst satır her zaman
+8. Her kayıttan sonra `STATUS.md`'yi güncelle (≤60 satır). En üst satır her zaman
    "insandan sıradaki eylem"dir. Gerçek takip yoksa "izliyorum" deme, son kontrol
-   saatini yaz.
+   saatini yaz. Dosya append edilmez, her seferinde yeniden yazılır: her bölümün
+   satır tavanı vardır, geçmiş üç katmanda zaman bazlı çürür ("Bu oturumda ne oldu"
+   → "Önceki oturum" → "Öncesi", en eskisi tek satıra iner). Ana hat, sabitlenen
+   kararlar ve "Denendi, işe yaramadı" çürümez — bunlar kaybolursa aynı fikir
+   tekrar denenir.
 9. Kayıtta olmayan şey için "kayıtta yok" de, uydurma. Ölçülmemiş skoru sayı olarak verme.
 10. Codex'e her çağrı `CODEX.md`'deki sabit kapla yapılır. Serbest metin çağrı yok.
 
@@ -67,6 +71,15 @@
 `/case` → ✋Onay 1 (CV + metrik) → hızlı baseline + ilk submission → ✋Onay 2
 → backlog → `/exp` döngüsü → ensemble → `/final` kapısı → final seçimi (insan)
 
+## Oturum başı / oturum sonu
+Yarışma günü tek sohbette bitmez; birden çok oturum açılır. Bağlam **sadece
+`STATUS.md` üzerinden** taşınır.
+- **Başta:** ilk iş `STATUS.md`'yi okumak. Üç satırla özetle — "buradayız /
+  nerede kalmıştık / insandan sıradaki eylem" — sonra dur, dosyayı değiştirme.
+- **Sonda:** insan "compact", "clear", "yeni oturum", "ara veriyorum",
+  "kapatıyorum" dediğinde `STATUS.md` kural 8'deki çürüme mantığıyla
+  yeniden yazılır.
+
 ## Kurtarma kuralları
 - Submission limiti dolduysa: OOF'ta biriktir, UTC gece yarısı (TR 03:00) sıfırlanınca gönder.
 - CV iyi LB kötü (veya tersi) ise: yeni deney açma, önce fold/gruplama ve format kontrolü.
@@ -76,4 +89,25 @@
 - Kişi azaldıysa: yeni FULL koşu açma, mevcut adayları tamamla ve ensemble'a git.
 
 ## Tekrarlanan hatalar
-- (boş — prova ve yarış sırasında insan "kural ekle" dediğinde buraya eklenir)
+- **Kernel başlığı = slug olmalı.** Kaggle, başlık kendi slugify'ıyla `id`'ye tam
+  dönüşmezse sessizce kendi ürettiği farklı bir slug kullanır; `status`/`fetch` o zaman
+  yanıltıcı "izin reddedildi" hatasıyla patlar. `kx.py` başlığı zaten `= slug` yapıyor ve
+  push sonrası otomatik doğruluyor — elle `kernel-metadata.json` düzenleme.
+- **`/kaggle/input/` yolu sabit değil.** Notebook editöründe düz `/kaggle/input/<slug>/`,
+  `kaggle kernels push` ile (CLI/batch) başlatılan koşularda ise iç içe
+  `/kaggle/input/competitions/<slug>/` ve `/kaggle/input/datasets/<owner>/<slug>/` olabilir.
+  Şablon artık `rglob` ile arıyor, sabit yol yazma.
+- **`status` "RUNNING" derken koşu gerçekte bitmiş olabilir** (prova: ~19 dk gecikme
+  görüldü). `runtime_min` sadece notebook-içi süreyi ölçer, Kaggle kuyruk+son-işleme
+  süresini içermez. `status` COMPLETE demeden de `fetch` dene — sonuç gerçekten yoksa
+  doğrulama zaten reddeder, zararı olmaz. FULL koşu zamanlamasında bu payı hesaba kat.
+- **Kaggle'ın sklearn sürümü yerelden farklı olabilir** (provada 1.6.1 vs yerel 1.9.1).
+  İndirilen `model.pkl` yerelde `pickle.load` ile açılamayabilir. Final kapısı madde 5
+  ("model temiz oturumda yüklendi mi") bunu **aynı ortamda** (Kaggle notebook içinde veya
+  eşleşen sklearn sürümüyle) test etsin, yerel farklı sürümle "açılmadı" diye YANLIŞ RED verme.
+- **Deney açmadan önce gerçekten `log/BACKLOG.md`'ye yaz.** Provada bir TRAPS bulgusu
+  backlog'a hiç girmeden doğrudan `kx.py new` ile denendi; `EXP-xxx` skill'in "dört satır
+  yoksa açma" kuralı sözde kaldı. Backlog boşsa önce oraya yaz, sonra deneyi aç.
+- **`kx.py fetch` `EXP_SUMMARY.md`'deki "Karar" sütununu doldurmaz** — bu insan/ajanın
+  `cmp` sonrası elle güncellemesi gereken bir alan. `card.md` güncellenince
+  `EXP_SUMMARY.md` satırını da aynı anda güncelle, unutma.
