@@ -44,7 +44,7 @@ Codex'e önceki bağlamı bildiğini varsayma. Okunacak dosyaların **tam yolunu
 
 - Codex **yalnız** `EXP-2xx` klasörlerine yazar.
 - Her `card.md`'de `owner`, `kernel_slug`, Kaggle notebook versiyonu ve koşu durumu bulunur.
-- Var olan bir slug'a push etmeden önce slug'ın deney kimliği doğrulanır (`kx.py push` yapar).
+- Notebook adı (`as-cl-exp-017` / `as-cx-exp-2xx`) deney kimliğinden türetilir; `kx.py new` basar. Var olan bir adın üstüne yazılmaz.
 - Merkezi dosyaların (STATUS, BACKLOG, EXP_SUMMARY) **tek yazarı Claude'dur.** Codex
   sonucu yapılandırılmış döndürür, merkezi kayda Claude işler.
 
@@ -76,7 +76,8 @@ ve tüm deney geçmişini geçersiz kılar. Codex'i pahalı olana bakmak için k
 > Gerçek test yapısına aykırı **iyimserlik üretme riski düşük** olan şema ana validation
 > olarak seçilir. Alternatif şema "duyarlılık kontrolü" olarak `core/cv_spec.md`'de saklanır.
 > İki şemada model sıralaması değişiyorsa validation belirsizliği açıkça kaydedilir ve
-> ilk submission'lar bu belirsizliği sınamak için kullanılır.
+> bu belirsizlik ancak insanın yapacağı bir gönderimle sınanabilir; akışta zorunlu
+> gönderim yoktur.
 
 Zaman varsa iki basit baseline iki şemada da koşulur. Zaman yoksa leakage riski düşük olan
 (daha sıkı) şema seçilir — **fakat bunun yalnızca pesimist skor üreteceği iddia edilmez.**
@@ -97,6 +98,27 @@ implementasyonuyla karşılaştırmak yeterlidir. Uyuşma tek başına yetmez: r
 elle hesaplanabilen küçük örnekler, skor yönü, sınıf sırası ve uç durumlar da kontrol edilir.
 Metrikte hakem **resmi formüldür.** Uyuşmazlık 20 dakikada çözülmezse basit olan seçilir
 ve `log/DECISIONS.md`'ye D-xx olarak kaydedilir.
+
+---
+
+## Çağrı 1b — Baseline kodu (birlikte yazılır)
+
+**Ne zaman:** D-01 onaylandıktan hemen sonra, `EXP-001` kodu yazılırken.
+
+Baseline tek başına yazılmaz. Claude `tools/code_template.py` iskeletini doldurur;
+Codex aynı case ve veri özetiyle **kendi baseline önerisini** bağımsız yazar. İkisi
+karşılaştırılır, ayrıştıkları yerde hakem veri kanıtıdır.
+
+**Şart:** iskelet, fold bloğu, metrik bloğu ve çıktı bloğu değişmez — Codex yalnız
+`hazirla()` ve `model_kur()` içeriğini önerir. Baseline **hızlı ve sade** olmalı:
+amaç yüksek skor değil, güvenilir bir ölçüm zemini.
+
+### İstenen çıktı formatı
+
+    - hazirla(): <hangi kolonlar, hangi dönüşüm, neden>
+    - model_kur(): <model ailesi + parametreler, neden bu>
+    - Tahmini süre: <dk>
+    - Riskler: <bu baseline neyi ölçemez>
 
 ---
 
@@ -132,8 +154,10 @@ yarısı kimse okumaz.
 
 Claude bir GBDT yazarken Codex farklı bir mimari yazar.
 
-**Şart:** Codex'in notebook'u da fold ve metriği `hackathon-core`'dan okur ve çıktı
-sözleşmesine (`core/cv_spec.md`) birebir uyar. Uymazsa ensemble'a alınmaz.
+**Şart:** Codex'in kodu da `tools/code_template.py` iskeletini kullanır — fold bloğu
+`core/folds_snippet.py`'den, metrik `core/metric.py`'den **aynen gömülüdür**, kendi
+fold'unu üretmez. Koşu aynı fold parmak izini basmalıdır; basmazsa ensemble'a alınmaz.
+Çıktı sözleşmesine (`core/cv_spec.md`) birebir uyar.
 
 Not: Ensemble'a değer katan şey farklı **model hatalarıdır**, farklı yazarın farklı
 **uygulama hataları** değil.
@@ -141,7 +165,7 @@ Not: Ensemble'a değer katan şey farklı **model hatalarıdır**, farklı yazar
 ### İstenen çıktı formatı
 
     - EXP: EXP-2xx
-    - Slug: as-cx-exp-2xx
+    - Kaggle notebook adi: as-cx-exp-2xx
     - Hipotez: <tek cümle>
     - Değişen parçalar: <ana hatta göre ne farklı>
     - Çıktılar: <sözleşmedeki dosyalar üretildi mi>
@@ -158,15 +182,24 @@ cevabı üretir. Doğru soru biçimi:
 
 > "Kalan üç saatte yapılabilecek **en değerli üç deney**, gerekçesi ve süresiyle."
 
-Girdi: `case/CASE.md` + `log/RESEARCH.md` + son OOF hata analizi.
+Girdi: `case/CASE.md` + `case/TRAPS.md` bulguları + `log/RESEARCH.md` + baseline sonucu
++ son OOF hata analizi + kalan süre.
+
+**Liste sıradan olmayacak.** İstenen, "GBDT dene, hiperparametre ara" gibi her yarışmada
+geçerli cevaplar değil; **bu verinin kendi yapısından** çıkan fikirlerdir. Sıralama
+dayanak gücüne göre yapılır: bu veride ölçülmüş bir gözlem, dış kaynaklı genel bir
+fikirden önce gelir. Puan formülü (Kazanç×Olasılık/Süre) yasak — uydurma kesinliktir.
+
+Öncelik eğilimi hatırlatılır: veri/CV düzeltmeleri > veri temsili ve feature >
+model ailesi > eğitim detayı > hiperparametre.
 
 ### İstenen çıktı formatı
 
-    En fazla 3 fikir. Her biri:
-    - Fikir: <tek cümle>
-    - Dayanak: <bu veride ölçülmüş gözlem veya kaynak>
-    - Uygulanacak değişiklik: <somut>
-    - Tahmini süre: <dk, notebook döngüsü sürtünmesi dahil>
+    En fazla 3 fikir. Her biri DÖRT alanla — eksik alanlı fikir backlog'a girmez:
+    - Gözlem: <bu veride ölçülen sayı; yoksa "ölçülmedi" yaz, uydurma>
+    - Neden: <bu izi bırakan süreç — veri nasıl üretilmiş olabilir>
+    - Dönüşüm: <gözlemin öznitelik/model hali, somut>
+    - Beklenen etki + süre: <yön ve büyüklük tahmini + dk, döngü sürtünmesi dahil>
 
 ---
 

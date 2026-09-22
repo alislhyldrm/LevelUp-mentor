@@ -1,11 +1,12 @@
 ---
 name: exp
-description: Tek bir deneyi baştan sona yürütür - backlog maddesini seçer, notebook'u hazırlar, Kaggle'da koşturur, çıktıyı indirip doğrular, parent ile fold fold karşılaştırır, kaydeder ve karar önerir. Kullan - "şunu dene", "B-03'ü koş", bir deney sonucu geldiğinde, deney kaydı güncellenmesi gerektiğinde.
+description: Tek bir deneyi baştan sona yürütür - backlog maddesini seçer, koşulacak kodu hazırlar, insana gösterir, insan Kaggle'da koşturur, dönen çıktıyı doğrular, parent ile fold fold karşılaştırır, kaydeder ve karar önerir. Kullan - "şunu dene", "B-03'ü koş", bir deney sonucu geldiğinde, deney kaydı güncellenmesi gerektiğinde.
 ---
 
 # Deney döngüsü
 
-Araç: `python tools/kx.py`. İnsan karar verir, sen yürütürsün ve kaydedersin.
+Araç: `python tools/kx.py`. **İnsan karar verir ve koşturur, sen kodu yazar ve kaydedersin.**
+Kaggle'a hiçbir şey göndermezsin; `kx.py` Kaggle CLI'yi hiç çağırmaz.
 
 ## Önce: deney açılabilir mi?
 
@@ -16,61 +17,65 @@ Ana hat oturduktan sonra her deney **tek hipotez** taşır. Teknik olarak zorunl
 değişiklikler aynı deneyde kalır. Ana hat oturmadan önceki keşif deneyleri birden fazla
 değişiklik içerebilir; `card.md`'de "keşif" işaretlenir ve karar kuralına girmez.
 
-Push etmeden önce `python tools/kx.py board` — kota ve eşzamanlı koşu limiti ortak kaynaktır.
+**Tek koşu, tek onay:** önceki koşunun sonucu kaydedilmeden sıradaki kod verilmez.
 
 ## Akış
 
 1. **Aç.** `python tools/kx.py new EXP-0xx --parent EXP-0yy --note "<hipotez>"`
    Numara aralığı: Claude `EXP-0xx`/`EXP-1xx`, Codex `EXP-2xx` (`CODEX.md`).
-   Tamam: klasör, notebook, `card.md`, `kernel-metadata.json` var.
+   Tamam: klasör, `code.py`, `card.md`, `diff.md`, `output/` var.
 
-2. **Notebook'u doldur.** Şablonun TODO'ları. Kurallar:
-   - Fold `hackathon-core/folds.csv`'den, metrik `hackathon-core/metric.py`'den okunur.
-     Notebook **kendi fold'unu üretmez.**
+2. **Kodu doldur.** `code.py` içindeki TODO'lar — **yalnız** `hazirla()` ve `model_kur()`.
+   Kurallar:
+   - Fold bloğu ve metrik bloğu `core/folds_snippet.py` + `core/metric.py`'den aynen
+     gömülüdür. **Bu bloklara dokunma.** Kod kendi fold'unu üretmez.
    - Fit edilen her dönüşüm fold **içinde** fit edilir.
-   - Her fold bitince skor basılır ve ara çıktı diske yazılır.
+   - Her fold bitince skor basılır.
    - Mod (FAST/FULL) ve seed açıkça yazılır. FAST tanımı `core/cv_spec.md`'de sabittir.
-   - Çıktılar sözleşmeye uyar; `artifacts/` hücresi silinmez.
-   - **Push'tan önce insana göster:** parent'a göre hangi kod satırları değişti (feature,
-     model, hiperparametre — ne eklendiyse). Skor tek başına rapor değildir; insan neyin
-     denendiğini kodda görmeden onay vermiş sayılmaz. Uzun deney zincirlerinde (arka arkaya
-     birden fazla push/fetch) her adımı ayrı ayrı özetle, sona biriktirip tek seferde verme.
-   Tamam: TODO kalmadı, mod ve tahmini süre aralığı `card.md`'de, insan kod farkını gördü.
+   - Çıktı bloğu ve `=== KX RESULT JSON ===` bloğu silinmez — kayıt bunlarla yapılır.
+   Tamam: TODO kalmadı, `python -c "import ast; ast.parse(open(...).read())"` temiz.
 
 3. **Riskliyse Codex'e incele.** Veri işleme, feature veya hedef değişkene dokunuyorsa
    `CODEX.md` Çağrı 2. Yalnız parametre değiştiyse atla.
-   **GEÇERSİZ KILAR** çıkarsa push durur, düzeltilir. Diğer iki kademe push'u durdurmaz;
-   `card.md`'ye "Codex incelemesi" satırına yazılır.
+   **GEÇERSİZ KILAR** çıkarsa kod insana verilmez, düzeltilir. Diğer iki kademe akışı
+   durdurmaz; `card.md`'ye "Codex incelemesi" satırına yazılır.
    Tamam: kademe ve varsa en küçük düzeltme kayıtlı.
 
-4. **Koştur.** `python tools/kx.py push EXP-0xx [--gpu] [--internet]`
-   GPU gerektirmeyen her şey CPU'da koşar. Uzun gece koşusundan önce aynı notebook'un
-   kısa bir denemesi başarıyla bitmiş olmalı.
-   Tamam: `log/RUNS.md`'ye satır düştü.
+4. **Kodu insana ver.** `diff.md`'yi doldur (parent'a göre değişen satırlar) ve sohbette
+   göster: ne değişti · neden · tahmini süre · GPU gerekiyor mu.
+   **Skor tek başına rapor değildir; insan neyin denendiğini kodda görmeden onay vermiş
+   sayılmaz.** Uzun zincirlerde her adımı ayrı ayrı özetle, sona biriktirme.
+   Tamam: `code.py` sohbete yapıştırıldı, `diff.md` dolu.
 
-5. **İzle.** `python tools/kx.py status EXP-0xx`. "İzliyorum" deme; son kontrol saatini yaz.
-   Tamam: `STATUS.md`'de son kontrol saati güncel.
+5. **İnsan koşturur.** Kaggle notebook editörü → kodu yapıştır → `Run All`.
+   Burada beklersin; kendi başına sıradaki deneye geçmezsin.
+   Tamam: insan "koştu" dedi ve ekran çıktısını verdi.
 
-6. **İndir ve doğrula.** `python tools/kx.py fetch EXP-0xx`
-   Doğrulama başarısızsa **sonuç kayda girmez.** Yeni deney açma, hatayı düzelt.
-   Koşu hatası veya eksik çıktı fikre RED yazdırmaz; "koşmadı" olarak kaydedilir.
-   Tamam: `EXP_SUMMARY.md`'ye satır düştü.
+6. **Çıktıyı kaydet.** Ekran çıktısını `experiments/EXP-0xx/output/run_log.txt`'ye yaz,
+   sonra `python tools/kx.py kayit EXP-0xx`.
+   - `run_log.txt` içindeki `=== KX RESULT JSON ===` bloğundan `result.json` üretilir.
+   - **Fold parmak izi** yereldeki `core/folds.csv` ile karşılaştırılır. Tutmazsa sonuç
+     kayda **girmez** — koşu başka fold'larla eğitilmiş demektir.
+   - OOF/submission dosyaları inmediyse ilgili kontroller "atlandı" olarak raporlanır;
+     bunları `card.md`'deki "Atlanan doğrulama" satırına yaz, sessizce geçme.
+   - Koşu hatası veya eksik çıktı fikre RED yazdırmaz; "koşmadı" olarak kaydedilir.
+   Tamam: `EXP_SUMMARY.md` ve `log/RUNS.md`'ye satır düştü.
 
 7. **Karşılaştır.** `python tools/kx.py cmp EXP-0xx`
    Çıktı: ana skor farkı, **diğer skor farkı** (bilgi amaçlı, otomatik öneriyi etkilemez),
    fold fold farklar, fold farklarının standart sapması, öneri.
-   `cv_mean` ve `cv_oof` zıt yöne işaret ederse araç UYARI basar — bu durumda otomatik
-   öneriyi olduğu gibi almadan **ikisine de bak**, card.md'ye hangisinin neden tercih
-   edildiğini yaz.
+   `cv_mean` ve `cv_oof` zıt yöne işaret ederse araç UYARI basar — ikisine de bak,
+   `card.md`'ye hangisinin neden tercih edildiğini yaz.
    Karar kuralı `CLAUDE.md`'de. **"BELİRSİZ" yok.** KABUL / HAVUZ / RED.
    CV'de beklenmedik büyük sıçrama varsa önce sızıntı araştır.
    Tamam: öneri insana sunuldu, kararı insan verdi.
 
-8. **Kaydet.** `card.md`'yi doldur (Sonuç, Karar, Ders, Codex incelemesi).
+8. **Kaydet.** `card.md`'yi doldur (Sonuç, Karar, Atlanan doğrulama, Ders, Codex incelemesi,
+   Ürün etkisi) ve `EXP_SUMMARY.md`'deki **Karar sütununu aynı anda** güncelle.
    `STATUS.md`'yi tam yeniden yazma; yalnız `Şu an`, `Bu oturumda ne oldu` ve
    `İnsandan sıradaki eylem` bölümlerini güncelle. KABUL ise `Şu an`'daki ana hat
    satırı da değişir. RED/HAVUZ çıkan deney aynı anda `Denendi, işe yaramadı`'ya
-   tek satır düşer (detay: EXP_SUMMARY.md). KABUL ise: ürüne izi tek satır +
+   tek satır düşer (detay: `EXP_SUMMARY.md`). KABUL ise: ürüne izi tek satır +
    global istatistikten türeyen feature varsa uyarı notu.
    Tamam: `card.md`, `EXP_SUMMARY.md`, `STATUS.md` üçü de tutarlı.
 
@@ -79,9 +84,13 @@ Push etmeden önce `python tools/kx.py board` — kota ve eşzamanlı koşu limi
 - Hiçbir OOF/test tahmini silinmez. RED çıkanlar da ensemble havuzunda kalır.
 - HAVUZ çıkan deney **farklı seed ile tekrar koşulmaz** — yeni bilgiye göre çok pahalı.
 - Fark küçükse daha basit/hızlı model korunur.
-- Submit etme. Öner; insan gönderdikten sonra `log/SUBMISSIONS.md`'ye yaz.
+- Kaggle'a gönderme. Gönderim kararı insanın; sonrasında `log/SUBMISSIONS.md`'ye yaz.
+- Model yalnız skora göre kurulmaz: `card.md`'deki "Ürün etkisi" satırı boş bırakılmaz.
+  Yarışma dosyasının toplu istatistiğinden türeyen feature (global mean, target encoding)
+  varsa, gerçek kullanımda nasıl üretileceği oraya tek satır yazılır.
 
 ## İlk baseline'dan hemen sonra
 **Hata analizi beş deney beklemez.** Kısa bir OOF hata analizi yap; amaç fikir listesi
 üretmek değil, bir sonraki deneyi değiştirecek **tek bulgu** aramaktır. Bulguyu
-`log/BACKLOG.md`'ye dayanak olarak yaz.
+`log/BACKLOG.md`'ye dayanak olarak yaz. Bu analiz OOF dosyasını gerektirir — insandan
+`oof.parquet`'i indirmesini iste (tek seferlik, her koşuda değil).

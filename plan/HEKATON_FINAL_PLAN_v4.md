@@ -3,6 +3,10 @@
 > **Bu dosya kodlama ajanı içindir.** Plan modunda oku, uygulama planı çıkar, onay almadan dosya oluşturma.
 > Bu dosyada olmayan araç, hook, mod, agent veya skill ekleme. Bir şey eksik görünüyorsa tahmin etme, sor.
 > **Değerlendirme kriteri:** Bir parça, yarış sırasında insana iş çıkarıyorsa değil, iş azaltıyorsa kurulur.
+>
+> **v4.1 — akış değişti.** Kaggle'a hiçbir şey gönderilmez (ne notebook, ne dataset, ne gönderim).
+> Koşuyu insan yapar: ajanın verdiği tek hücrelik kod Kaggle notebook'una yapıştırılır.
+> Bu dosya ile `CLAUDE.md` çelişirse **`CLAUDE.md` kazanır.**
 
 ---
 
@@ -59,7 +63,7 @@ hackathon/
 │   ├── CASE.md
 │   ├── TRAPS.md         # veri tipine göre tuzak kontrol listesi (~40 satır, tek dosya)
 │   └── pages/           # yarışma sayfalarının metni
-├── core/                # → Kaggle'a "hackathon-core" özel dataset'i olarak yüklenir
+├── core/                # fold sözleşmesi — YEREL, Kaggle'a yüklenmez
 │   ├── folds.csv
 │   ├── metric.py
 │   └── cv_spec.md
@@ -81,11 +85,17 @@ hackathon/
 
 6 kişi 6 farklı sistemde çalışacak. Aşağıdakilere uymayan çıktı **karşılaştırmaya ve ensemble'a alınmaz.** Bu sözleşme Cuma öğleden sonra takımın tamamına tek sayfa olarak dağıtılır.
 
-### 4.1 `hackathon-core` dataset'i
-Onay 1'den sonra `core/` klasörü Kaggle'a özel dataset olarak yüklenir. İçinde:
-- `folds.csv` → satır kimliği + `fold` kolonu. Tüm notebook'lar fold'u buradan okur, kendi fold'unu **üretmez**.
+### 4.1 `core/` — fold sözleşmesi (YEREL, Kaggle'a yüklenmez)
+Onay 1'den sonra `core/` yerelde kurulur:
+- `folds_snippet.py` → fold üretim kodu + parmak izi fonksiyonu. **Tek doğruluk kaynağı.**
+- `folds.csv` → `tools/make_folds.py` üretir: `id, fold, y`. Yerelde kalır.
 - `metric.py` → tek fonksiyon: `score(y_true, y_pred) -> float` + `GREATER_IS_BETTER` sabiti.
-- `cv_spec.md` → 10 satır: fold mantığı, gruplama anahtarı, **ana skorun hangisi olduğu** (bkz. 4.3).
+- `cv_spec.md` → fold mantığı, gruplama anahtarı, **ana skorun hangisi olduğu** (bkz. 4.3), **fold parmak izi**.
+
+Kaggle'a dataset yüklenmediği için garanti dosya paylaşımı değil **kod eşitliğidir**:
+`folds_snippet.py` ve `metric.py`'nin metni `kx.py new` tarafından `code.py`'ye aynen
+gömülür, koşu fold parmak izini ekrana basar, `kx.py kayit` bunu yerel `folds.csv` ile
+karşılaştırır. Tutmayan sonuç kayda girmez.
 
 ### 4.2 Çıktı sözleşmesi
 Her koşu `/kaggle/working/` altına şunları yazar:
@@ -97,7 +107,7 @@ Her koşu `/kaggle/working/` altına şunları yazar:
 | `submission.csv` | Yarışmanın istediği tam format. |
 | `result.json` | `{exp_id, parent, mode, seed, fold_scores[], cv_mean, cv_oof, n_folds_done, n_rows_oof, runtime_min, git_note}` |
 
-`kx.py fetch` bu dosyaları indirdikten sonra **otomatik doğrular**: id kolonu var mı, satır sayısı folds.csv ile eşleşiyor mu, NaN/tekrar var mı, `n_folds_done` tam mı. Biri tutmazsa sonuç kayda girmez, ekrana hata basar. Bu kontrol, gece yarısı fark edilen hizalama hatasının tek panzehiri.
+`kx.py kayit` bu dosyaları **otomatik doğrular** (fold parmak izi dahil): id kolonu var mı, satır sayısı folds.csv ile eşleşiyor mu, NaN/tekrar var mı, `n_folds_done` tam mı. Biri tutmazsa sonuç kayda girmez, ekrana hata basar. Bu kontrol, gece yarısı fark edilen hizalama hatasının tek panzehiri.
 
 ### 4.3 İki skor birden
 `cv_mean` (fold skorlarının ortalaması) ve `cv_oof` (birleştirilmiş OOF üzerinden tek hesap) **ikisi de** yazılır. AUC, F1, MAP gibi metriklerde bunlar farklıdır. `cv_spec.md` hangisinin ana skor olduğunu Onay 1'de sabitler; karar ve sıralama hep onunla yapılır.
@@ -109,28 +119,27 @@ Kernel slug'ı: `<isim-baş-harfleri>-exp-<no>` → `as-exp-017`. Deney klasör�
 
 ## 5. Otomasyon: `tools/kx.py`
 
-Tek dosya, ~200 satır, sadece `kaggle` CLI'yi sarar. Gemini'nin işaret ettiği "insan kuryeliği" sorununun çözümü budur ve 24 saatte en çok zamanı burası kurtarır.
+Tek dosya. **Kaggle CLI'yi hiç çağırmaz** — ne kernel, ne dataset, ne gönderim.
+Yerelde üretir, doğrular, karşılaştırır; koşuyu insan Kaggle notebook'unda yapar.
 
 ```
 kx.py new   EXP-017 --parent EXP-012 --note "target encoding"
-            → klasör + şablon notebook + kernel-metadata.json üretir
-kx.py push  EXP-017 [--gpu] [--internet]
-            → kernel-metadata.json'ı yazar, `kaggle kernels push` ile batch koşuyu başlatır,
-              RUNS.md'ye satır ekler
-kx.py status [EXP-017]
-            → çalışanların durumu; RUNS.md'yi günceller
-kx.py fetch EXP-017
-            → `kaggle kernels output` → experiments/EXP-017/output/
-              + Bölüm 4.2 doğrulaması + result.json'u EXP_SUMMARY.md'ye yazar
+            → klasör + code.py (tek hücre, fold+metrik gömülü) + card.md + diff.md
+kx.py kayit EXP-017
+            → output/run_log.txt'deki KX RESULT JSON bloğundan result.json üretir,
+              Bölüm 4.2 doğrulaması + fold parmak izi kontrolü, EXP_SUMMARY.md + RUNS.md
 kx.py cmp   EXP-017
             → parent ile fold fold karşılaştırma tablosu + karar için kanıt (Bölüm 8.3)
 kx.py board
-            → tek ekran: koşanlar, tahmini bitişler, son 10 sonuç, mevcut en iyi aday
+            → tek ekran: sonuçlar, bekleyenler, en iyi aday, yerel fold parmak izi
 ```
 
-`kernel-metadata.json` alanları: `id`, `title`, `code_file`, `language: python`, `kernel_type: notebook`, `is_private: true`, `enable_gpu`, `enable_internet`, `competition_sources`, `dataset_sources` (`hackathon-core` + gerekirse ağırlık dataset'leri), `model_sources`.
+Koşu döngüsü: kodu insana ver (+ `diff.md`) → insan Kaggle'da `Run All` → ekran çıktısı
+`output/run_log.txt`'ye → `kx.py kayit`. **Tek koşu, tek onay:** önceki koşu kaydedilmeden
+sıradaki kod verilmez.
 
-**Submit otomatikleştirilmez.** `kx.py` sadece "şu dosya şu sebeple gönderilebilir" satırını basar; insan gönderir, `SUBMISSIONS.md`'ye tek satır düşülür.
+**Gönderim otomatikleştirilmez.** `kx.py` sadece "şu dosya şu sebeple gönderilebilir"
+satırını basar; insan gönderir, `SUBMISSIONS.md`'ye tek satır düşülür.
 
 `tools/blend.py`: ~60 satır. OOF'lar üzerinde önce **eşit ağırlıklı** karışımı ölçer, sonra sınırlı sayıda (≤200 adım) ağırlık denemesi yapar. Aşırı uyum riskine karşı kural: **ağırlık araması yapılan OOF skoru bağımsız doğrulama sayılmaz**; ensemble ancak en iyi tek modeli fold bazında da geçiyorsa kabul edilir.
 
@@ -142,7 +151,7 @@ Tek hesap, 6 kişi. Push etmeden önce `kx.py board` bakılır. Satır formatı:
 ```
 
 Kurallar:
-- GPU gerektirmeyen her şey **CPU'da koşar** (tablo/GBDT dahil). GPU kotası derin öğrenmeye ve gece koşularına saklanır.
+- GPU gerektirmeyen her şey **CPU'da koşar** (tablo/GBDT dahil). GPU kotası derin öğrenmeye ve uzun FULL koşulara saklanır.
 - Eşzamanlı koşu limiti hesap başınadır ve GPU tarafında dardır. **Gerçek limiti Cuma 11:00 provasında ölç**, CASE.md'ye yaz, varsayma.
 - Kalan GPU kotası Cuma 11:00'de ve gece 00:00'da kontrol edilir, STATUS.md'ye yazılır.
 
@@ -181,8 +190,9 @@ STATUS.md (durum) · case/CASE.md (kural, metrik, format) · research/RESEARCH.m
 · submissions/SUBMISSIONS.md · DECISIONS.md · RUNS.md (Kaggle'da ne koşuyor)
 
 ## Akış
-/case → ✋Onay 1 (CV + metrik) → hızlı baseline + ilk submission → ✋Onay 2 (kontrol listesi)
-→ backlog → /exp döngüsü → ensemble → final seçimi (insan)
+/case → ✋Onay 1 (CV + metrik) → baseline (Codex ile) → koşu: insan → skor
+→ OOF hata analizi + backlog → ✋Onay 2 (kontrol listesi) → /exp döngüsü → ensemble
+→ final seçimi ve gönderim (insan)
 
 ## Kurtarma kuralları
 - Submission limiti dolduysa: OOF'ta biriktir, UTC gece yarısı (TR 03:00) sıfırlanınca gönder.
@@ -206,19 +216,16 @@ STATUS.md (durum) · case/CASE.md (kural, metrik, format) · research/RESEARCH.m
 | **11:00 (T−1)** | Hazırlık kontrol listesi (Bölüm 12.3) | — |
 | 12:00 (T+0:00) | **İlk 10 dakika triyaj:** code competition mı? metrik ve yönü? submission formatı? günlük limit? internet/süre kısıtı? → CASE.md'nin ilk 10 satırı | — |
 | 12:10 | Veri `kaggle competitions download` ile iner. Paralel: fast-track notebook iskeleti | — |
-| 12:45 | **Fast-track koşu push edilir.** Sabit/medyan tahmin veya ham GBDT. Amaç skor değil, zincirin çalıştığını tescil etmek | — |
-| 13:30 | **İlk geçerli submission hedefi.** Sert sınır: 15:00. Bu olmadan derin feature işine geçilmez | Basitleştir, daha basit tahminle gönder |
+| 12:45 | **Fast-track koşu (insan yapıştırır, Run All).** Sabit/medyan tahmin veya ham GBDT. Amaç skor değil, zincirin çalıştığını tescil etmek | — |
+| 13:30 | **Format kontrolünden geçmiş, gönderilmeye hazır ilk `submission.csv` hedefi.** Sert sınır: 15:00. Gönderme kararı insanın | Basitleştir, daha basit tahminle üret |
 | 12:45–14:00 | Paralel: EDA, train/test farkı, gruplama anahtarı, metrik yazımı (+ Codex bağımsız kontrolü) | EDA kısalır, fold mantığı korunur |
-| 14:00 | **✋ Onay 1:** CV şeması + metrik + ana skor (`cv_mean` mi `cv_oof` mu) sabitlenir → D-01. `core/` Kaggle'a yüklenir | — |
+| 14:00 | **✋ Onay 1:** CV şeması + metrik + ana skor (`cv_mean` mi `cv_oof` mu) sabitlenir → D-01. `core/` yerelde kurulur, `make_folds.py` koşar, parmak izi `cv_spec.md`'ye yazılır | — |
 | 14:00–14:45 | **Araştırma: 45 dakikalık sert kutu.** 3 paralel arama görevi. Çıktı kapsamlı özet değil: "şimdi denenecek 3 fikir, dayanağı, maliyeti". Paralel: güçlü baseline yazılır | 30 dakikaya in, baseline'a geç |
 | 14:45–16:15 | **Tek güçlü baseline** FULL koşu. İkinci model ailesi ancak ilk sonuç ve kota görüldükten sonra açılır | İkinci aile iptal |
 | 16:15 | **✋ Onay 2 kontrol listesi** (Bölüm 8.4) | — |
 | 16:30–17:00 | Backlog: en fazla 10 madde, ilk 3'ü koşulabilir ayrıntıda | 6 madde, ilk 2'si ayrıntılı |
-| 17:00–00:00 | **Deney döngüsü.** Gerçekçi hedef: 8–15 deney (yükleme/indirme sürtünmesi dahil) | Düşük öncelikli maddeler Cumartesi'ye bırakılmaz, iptal edilir |
-| **02:30** | Cuma'nın kalan submission hakları 03:00'te yanar. En iyi adaylar gönderilir | — |
-| 00:00–00:30 | **Gece kuyruğu:** en iyi 2–3 adayın FULL + farklı seed koşuları başlatılır. Uzun gece koşusundan önce aynı notebook'un kısa bir denemesi başarıyla bitmiş olmalı | Sadece 1 aday |
-| gece | 2 kişilik nöbet (2'şer saat): kuyruk boşalmasın, hata veren koşu yerine sıradakini başlat | Kuyruğu kısa tut |
-| 07:30–08:00 | Gece çıktıları toplanır, doğrulanır, kaydedilir | — |
+| 17:00–08:00 | **Deney döngüsü.** Gerçekçi hedef: 8–15 deney (yükleme/indirme sürtünmesi dahil). Uzun bir FULL koşudan önce aynı kodun kısa bir denemesi başarıyla bitmiş olmalı | FULL yerine FAST; düşük öncelikli maddeler iptal edilir |
+| **02:30** | Cuma'nın kalan gönderim hakları 03:00'te yanar. İnsan karar verir; ajan hazır adayları teslim kartıyla sunar | — |
 | 08:00–09:00 | Son deneyler. **Son FULL başlatma saati = 12:00 − (ölçülen koşu süresi × 1.5) − 45 dk.** Bu saat STATUS.md'ye yazılır ve geçilmez | — |
 | 09:00–10:30 | Ensemble + (code competition ise) **tek inference notebook'unun uçtan uca çalışması** | Eşit ağırlıklı 2–3 model karışımıyla yetin |
 | 10:30–11:15 | Final aday submission'ları (insan) | — |
@@ -232,9 +239,9 @@ Paralel iş kolu: **Cuma akşamından itibaren en az 1 kişi ürün iskeletine b
 ## 8. Deney protokolü
 
 ### 8.1 Notebook kuralları
-- İlk hücre (markdown): EXP ID, parent, hipotez, mod (FAST/FULL), seed, GPU, internet, eklenecek girdiler, tahmini süre **aralığı** (tek sayı değil).
+- `code.py` başlığı: EXP ID, parent, hipotez, mod (FAST/FULL), seed, GPU gereksinimi, tahmini süre **aralığı** (tek sayı değil).
 - Veri yolları **açıkça doğrulanır**: beklenen dosya adı ve şema kontrol edilir, birden fazla eşleşmede sessizce devam edilmez.
-- Fold `hackathon-core/folds.csv`'den, metrik `hackathon-core/metric.py`'den okunur.
+- Fold bloğu `core/folds_snippet.py`'den, metrik `core/metric.py`'den **aynen gömülür**; kod kendi fold'unu üretmez. Koşu fold parmak izini basar.
 - Fit edilen her dönüşüm fold içinde fit edilir.
 - Her fold bitince skor basılır ve **ara çıktı diske yazılır** (süre limitine takılırsa yarısı kurtulur).
 - Çıktılar Bölüm 4.2 sözleşmesine uyar.
@@ -254,10 +261,11 @@ Paralel iş kolu: **Cuma akşamından itibaren en az 1 kişi ürün iskeletine b
 "BELİRSİZ" durumu kaldırıldı; yerine ana hattı bloklamayan HAVUZ geldi.
 
 ### 8.4 ✋ Onay 2 kontrol listesi
-- [ ] Fold'lar ve metrik `hackathon-core`'dan mı okunuyor?
+- [ ] Koşunun fold parmak izi yerel `core/folds.csv` ile aynı mı?
 - [ ] Fit edilen her şey fold içinde mi?
 - [ ] `oof.parquet` / `test_preds.parquet` **id kolonlu** mu, satır sayısı tam mı?
-- [ ] İlk submission geçerli mi, LB skoru beklenen aralıkta mı?
+- [ ] `submission.csv` format kontrolünden geçti mi (kolon, satır, id sırası, NaN)?
+- [ ] OOF hata analizi yapıldı mı, `log/BACKLOG.md` dolu ve insana gösterildi mi?
 - [ ] Bir FAST deney kaç dakika, bir FULL deney kaç dakika sürüyor? (STATUS.md'ye yazıldı mı?)
 - [ ] Kalan GPU kotası ve eşzamanlı koşu limiti biliniyor mu?
 
@@ -328,7 +336,7 @@ Değerlendirmeler burada ayrışıyordu; karar: **fikir tartışması turları k
 
 1. **Metrik doğrulaması (Faz 0, ~15 dk).** Codex, kodu görmeden Evaluation sayfasından metriği yazar. İki implementasyon rastgele girdilerde karşılaştırılır. **Ama uyuşma tek başına yeterli değil:** resmi örnek varsa onun sonucu, elle hesaplanabilen küçük örnekler, skor yönü, sınıf sırası ve uç durumlar da kontrol edilir. Standart bir metrikse sıfırdan yeniden yazmak yerine güvenilir bir kütüphane implementasyonuyla karşılaştırmak yeterlidir. **Uyuşmazlık 20 dakikada çözülmezse** resmi formül hakemdir; çözülmezse basit olan seçilir ve D-xx olarak kaydedilir.
 2. **Yükleme öncesi sızıntı incelemesi (riskli deneylerde).** Sadece veri işleme, feature veya hedef değişkene dokunan deneylerde. Sorular: fold dışında fit var mı, gerçekten tek hipotez mi, fold/metrik core'dan mı okunuyor. Parametre değişikliklerinde atlanır.
-3. **Bağımsız model hattı.** Claude bir GBDT yazarken Codex farklı bir mimari yazar. **Şart:** Codex'in notebook'u da fold ve metriği `hackathon-core`'dan okur ve Bölüm 4.2 sözleşmesine birebir uyar; uymazsa ensemble'a alınmaz. (Not: ensemble'a değer katan şey farklı **model hatalarıdır**, farklı yazarın farklı **uygulama hataları** değil.)
+3. **Bağımsız model hattı.** Claude bir GBDT yazarken Codex farklı bir mimari yazar. **Şart:** Codex'in kodu da `tools/code_template.py` iskeletini kullanır, fold ve metrik bloklarını `core/`'dan aynen gömer, aynı fold parmak izini basar ve Bölüm 4.2 sözleşmesine birebir uyar; uymazsa ensemble'a alınmaz. (Not: ensemble'a değer katan şey farklı **model hatalarıdır**, farklı yazarın farklı **uygulama hataları** değil.)
 
 Ek: **10 dakikalık tek tur fikir alışverişi**, sadece iki anda — ilk backlog kurulurken ve backlog'da 3'ten az ŞİMDİ maddesi kaldığında. Girdi olarak CASE.md + RESEARCH.md + son OOF hata analizi verilir. Boşlukta "skoru nasıl artırırız" sorulmaz.
 

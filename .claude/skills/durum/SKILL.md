@@ -1,13 +1,13 @@
 ---
 name: durum
-description: Durum turu ve vardiya devri - T+saat, Kaggle'da ne koşuyor, kalan süre ve gönderim hakkı, son FULL başlatma saati, kapsam riski ve sıradaki 3 iş. Kullanım - /durum ya da /durum devir
+description: Durum turu ve oturum devri - T+saat, Kaggle'da ne koşuyor, kalan süre ve gönderim hakkı, son FULL başlatma saati, kapsam riski ve sıradaki 3 iş. Kullanım - /durum ya da /durum devir
 disable-model-invocation: true
 argument-hint: "[devir]"
 ---
 
 # Durum turu
 
-2-3 saatte bir ve gece nöbetinde çalıştır. Amaç: zamanı ve gönderim hakkını görünür
+2-3 saatte bir çalıştır. Amaç: zamanı ve gönderim hakkını görünür
 kılmak, kapsam riskini erken yakalamak. **Sen resmi çizersin, kararı insan verir.**
 
 ## Tur
@@ -50,7 +50,7 @@ kılmak, kapsam riskini erken yakalamak. **Sen resmi çizersin, kararı insan ve
 
 ## `/durum devir`
 
-Nöbeti devrederken tura ek olarak 5 satır üretilir. Bu satırlar panoya
+Oturum devrederken (compact / yeni sohbet / ara verme) tura ek olarak 5 satır üretilir. Bu satırlar panoya
 verilmekle kalmaz, `STATUS.md`'ye kalıcı olarak yazılır:
 - "Ne yapıldı" + "Çalışır durumda mı" → `Bu oturumda ne oldu`
 - "Nerede kaldı" + "Dikkat" → `Nerede kaldım / dikkat`

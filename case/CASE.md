@@ -1,6 +1,8 @@
-# CASE
+# CASE — <yarışma adı>
 
 > `/case` doldurur. Ham sayfa metinleri `case/pages/` altındadır — çelişkide **ham metin hakemdir.**
+> Kaggle sayfaları login arkasındadır; Overview · Data · Evaluation · Rules metnini **insan yapıştırır.**
+> Cevaplanamayan satır boş bırakılmaz: **ENGEL — bilinmiyor + nasıl öğrenilecek** yazılır.
 
 ## Triyaj (ilk 10 dakika — bunlar bilinmeden kod yazılmaz)
 
@@ -15,7 +17,7 @@
 | 7 | Katılım ve kural kabulü yapıldı mı? | | |
 | 8 | Eşzamanlı koşu limiti (ölçüldü mü)? | | |
 | 9 | Bitiş saati ve final seçim hakkı? | | |
-| 10 | Dış veri / hazır model izni? | | |
+| 10 | Dış veri / hazır model izni; veriyi Kaggle dışına taşımak serbest mi? | | |
 
 ## Görev
 - Girdi → tahmin birimi → çıktı:

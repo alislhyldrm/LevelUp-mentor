@@ -1,8 +1,10 @@
 {
-  "username": "alisalihyldrm",
   "initials": "as",
   "competition": "",
-  "core_dataset": "",
+  "target": "",
+  "id_col": "id",
+  "pos_label": "",
+  "sample_submission": "data/sample_submission.csv",
   "main_score": "cv_mean",
   "greater_is_better": true
 }

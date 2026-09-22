@@ -1,9 +1,10 @@
 # EXP_SUMMARY
 
-Tüm deneyler tek tabloda. `kx.py fetch` doğrulamayı geçen her sonucu buraya yazar.
+Tüm deneyler tek tabloda. `kx.py kayit` doğrulamayı geçen her sonucu buraya yazar.
+**Karar sütununu `cmp`'den sonra elle doldur** — araç doldurmaz.
 Doğrulamayı geçmeyen sonuç **kayda girmez.**
 
-| EXP | owner | parent | mod | ana skor | cv_mean | cv_oof | fold'lar | dk | karar | slug / versiyon |
+| EXP | owner | parent | mod | ana skor | cv_mean | cv_oof | fold'lar | dk | karar | fold izi |
 |---|---|---|---|---|---|---|---|---|---|---|
 | | | | | | | | | | | |
 

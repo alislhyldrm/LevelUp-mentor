@@ -8,6 +8,7 @@ gönderildikten sonra buraya tek satır düşer.
 | | | | | | | | |
 
 ## Hatırlatma
-- Günlük hak UTC gece yarısı (TR 03:00) sıfırlanır. 02:30'da kalan haklar gönderilir.
+- Günlük hak UTC gece yarısı (TR 03:00) sıfırlanır; o saatte kullanılmayan hak yanar.
+  Ajan 02:30'da hazır adayları teslim kartıyla hatırlatır, **göndermez** — karar insanın.
 - Final seçiminden önce `/final` kapısı çalıştırılır. `KALDI` veya `DOĞRULANAMADI`
   olan aday final için önerilemez.

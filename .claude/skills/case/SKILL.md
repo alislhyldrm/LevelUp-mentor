@@ -21,7 +21,8 @@ Hedef, ilk 10 dakikada kod yazmaya değil, **neyi ölçtüğümüzü bilmeye** v
 2. **Triyaj — `case/CASE.md` ilk tablosu.** 10 satırın hepsi cevaplanır veya
    "bilinmiyor + nasıl öğrenilecek" yazılır. Tahmin etme.
    Özellikle: **code competition mı**, metrik ve yönü, submission formatı,
-   günlük gönderim limiti, internet/süre kısıtı, kural kabulü yapıldı mı.
+   günlük gönderim limiti, internet/süre kısıtı, kural kabulü yapıldı mı,
+   **veriyi/kodu Kaggle dışına taşımak serbest mi** (case Kaggle dışı bir kaynaktansa).
    Tamam: 10 satır dolu; bilinmeyenler engel olarak işaretli.
 
 3. **Ürün bölümü (15 dk, Onay 1'i bekletmez).** `CASE.md` "Ürün bölümü" dört satırı:
@@ -39,11 +40,15 @@ Hedef, ilk 10 dakikada kod yazmaya değil, **neyi ölçtüğümüzü bilmeye** v
    Çakışma çıkarsa hakem veri kanıtıdır — anlatım gücü değil.
    Tamam: iki öneri ve veri kanıtları elde; çatışma varsa `CODEX.md` kuralı uygulandı.
 
-6. **`core/` sözleşmesini kur.** `core/folds.csv` (satır kimliği + `fold`),
-   `core/metric.py` (`score(y_true, y_pred)` + `GREATER_IS_BETTER`), `core/cv_spec.md`
-   (ana şema, ana skor, duyarlılık şeması, FAST tanımı). Sonra Kaggle'a
-   `hackathon-core` dataset'i olarak yükle, slug'ı `kx.json`'a yaz.
-   Tamam: `cv_spec.md` boş alan bırakmadan dolu; dataset Kaggle'da.
+6. **`core/` sözleşmesini kur — hepsi YEREL, Kaggle'a hiçbir şey yüklenmez.**
+   - `core/folds_snippet.py`: fold şeması, seed, fold sayısı D-01'e göre sabitlenir.
+   - `core/metric.py`: `score(y_true, y_pred)` + `GREATER_IS_BETTER`, resmi metrikle.
+   - `python tools/make_folds.py --target <hedef> [--pos <etiket>]` → `core/folds.csv`
+     + **fold parmak izi**. Parmak izi `core/cv_spec.md`'ye yazılır.
+   - `core/cv_spec.md`: ana şema, ana skor, duyarlılık şeması, FAST tanımı, parmak izi.
+   - `kx.json`: `target`, `id_col`, `pos_label`, `main_score`, `greater_is_better` doldurulur.
+   Her koşu bu parmak izini basar; tutmayan sonuç kayda girmez.
+   Tamam: `cv_spec.md` boş alan bırakmadan dolu; `folds.csv` ve parmak izi var.
 
 7. **Case'i insana anlat.** Özet kod değildir. Beş başlık:
    ne isteniyor · nasıl ölçülüyor · ilk 3 risk · ilk hamle önerisi ·
@@ -55,9 +60,13 @@ Hedef, ilk 10 dakikada kod yazmaya değil, **neyi ölçtüğümüzü bilmeye** v
    Tamam: D-01 kayıtlı. Bundan sonra fold ve metrik **sabittir** (CLAUDE.md kural 1).
 
 ## Sonra
-`log/BACKLOG.md` kurulur (`CODEX.md` Çağrı 4 ile birlikte), `/exp` döngüsü başlar.
-**13:30 hedefi, 15:00 sert sınırı: ilk geçerli submission.** Bu olmadan derin feature
-işine geçilmez; gerekirse daha basit tahminle gönder.
+Baseline (`EXP-001`) **Codex ile birlikte** yazılır, insan Kaggle'da koşturur, skor alınır.
+Sonra OOF hata analizi + `log/BACKLOG.md` (`CODEX.md` Çağrı 4 ile birlikte) → ✋Onay 2 →
+`/exp` döngüsü.
+
+**13:30 hedefi, 15:00 sert sınırı: format kontrolünden geçmiş, gönderilmeye hazır ilk
+`submission.csv`.** Bu olmadan derin feature işine geçilmez; gerekirse daha basit
+tahminle üret. **Gönderme kararı insanın** — akışta zorunlu submission yok.
 
 ## Yeni resmi bilgi geldiğinde
 Yalnız etkilenen bölümleri güncelle. Metrik, veri, ayrım veya kapsam değiştiyse

@@ -1,8 +1,12 @@
 # Kaggle Hekaton — Proje Kuralları
 
 ## Rol
-İnsan karar verir ve submit eder. Sen notebook yazarsın, `kx.py` ile koşturursun,
-çıktıları doğrular, karşılaştırır ve kaydedersin. Sorulara dosyadan cevap verirsin.
+İnsan karar verir, koşturur ve gönderir. Sen kodu yazarsın, insana verirsin, dönen
+çıktıyı doğrular, karşılaştırır ve kaydedersin. Sorulara dosyadan cevap verirsin.
+
+**Kaggle'a hiçbir şey göndermezsin.** Ne notebook, ne dataset, ne submission.
+Kaggle'dan yalnız yarışma verisi indirilir. Kaggle'a giden tek şey, insanın notebook
+editörüne kendi elleriyle yapıştırdığı koddur. `tools/kx.py` Kaggle CLI'yi hiç çağırmaz.
 
 ## Baseline'dan hemen sonra: liste zorunlu
 İlk baseline (`EXP-001` veya case'in ilk deneyi) skorunu aldıktan sonra, **başka hiçbir
@@ -38,11 +42,16 @@ değişiklik olur — planın en başta reddettiği şey tam olarak budur (bkz. 
 2. Çıktı sözleşmesine (`core/cv_spec.md`) uymayan sonuç kayda girmez.
 3. Ana hat oturduktan sonra her deney tek hipotez taşır. Teknik olarak zorunlu birlikte
    değişiklikler aynı deneyde kalır.
-4. Sonucu alınmış deney klasörü değiştirilmez, yeni deney açılır. "Hata" = notebook
+4. Sonucu alınmış deney klasörü değiştirilmez, yeni deney açılır. "Hata" = kod
    koşmadı veya çıktı üretmedi. **Kötü skor hata değildir.**
 5. Hiçbir OOF/test tahmini silinmez. RED çıkanlar da ensemble havuzunda kalır.
+   Her koşuda yalnız ekran çıktısı kaydedilir; OOF dosyaları **ensemble aşamasında**
+   insan tarafından indirilir (`experiments/EXP-xxx/output/`). O ana kadar OOF sadece
+   Kaggle koşusunun çıktısında durur — `blend.py` dosyalar inmeden çalışmaz.
 6. CV'de beklenmedik büyük sıçramada önce sızıntı araştırılır.
-7. **Submit etme.** Öner; insan gönderdikten sonra `log/SUBMISSIONS.md`'ye kaydet.
+7. **Gönderme.** Gönderim kararı insanındır ve saat hedefine bağlı değildir. Sen yalnız
+   hazır aday önerirsin: EXP no · ana skor · dosya yolu · format kontrolü sonucu.
+   İnsan gönderdikten sonra `log/SUBMISSIONS.md`'ye kaydet.
 8. Her kayıttan sonra `STATUS.md`'yi güncelle (≤60 satır). En üst satır her zaman
    "insandan sıradaki eylem"dir. Gerçek takip yoksa "izliyorum" deme, son kontrol
    saatini yaz. Dosya append edilmez, her seferinde yeniden yazılır: her bölümün
@@ -73,15 +82,28 @@ değişiklik olur — planın en başta reddettiği şey tam olarak budur (bkz. 
 | Fikrin kaynağı | `log/RESEARCH.md` |
 | Neden bu deney | `log/BACKLOG.md` |
 | Deney sonuçları | `experiments/EXP_SUMMARY.md` → `EXP-xxx/card.md` |
-| Kaggle'da ne koşuyor | `log/RUNS.md` |
+| Hangi koşu yapıldı | `log/RUNS.md` |
+| Koşulacak kod | `experiments/EXP-xxx/code.py` (+ `diff.md`) |
 | İnsan kararları | `log/DECISIONS.md` |
 | Mentor ne dedi, ne sormalıyız | `log/MENTOR.md` |
 | Ne gönderildi | `log/SUBMISSIONS.md` |
 | Codex'e nasıl çağrı yazılır | `CODEX.md` |
 
 ## Akış
-`/case` → ✋Onay 1 (CV + metrik) → hızlı baseline + ilk submission → ✋Onay 2
-→ backlog → `/exp` döngüsü → ensemble → `/final` kapısı → final seçimi (insan)
+`/case` → ✋Onay 1 (CV + metrik) → baseline (Codex ile birlikte yazılır) → **koşu: insan**
+→ skor → OOF hata analizi + `log/BACKLOG.md` → ✋Onay 2 → `/exp` döngüsü → ensemble
+→ `/final` kapısı → final seçimi ve gönderim (insan)
+
+Akışta **zorunlu submission yoktur.** Gönderim kararı insanındır, saat hedefine bağlı
+değildir; sen yalnız gönderilmeye hazır aday önerirsin.
+
+**✋Onay 2 tek tanım:** baseline skoru + OOF hata analizi + dolu `log/BACKLOG.md` aynı
+pakette insana sunulur. Onay gelmeden iterasyon başlamaz.
+
+### Tek koşu, tek onay
+Bir koşunun sonucu kaydedilmeden sıradaki kod verilmez. Art arda birkaç koşu planlayıp
+insanı sonuçta bilgilendirmek bu kuralın ihlalidir. Her turda:
+kodu ver (+ parent farkı) → insan koşturur → çıktıyı ver → `kayit` → `cmp` → karar.
 
 ## Oturum başı / oturum sonu
 Yarışma günü tek sohbette bitmez; birden çok oturum açılır. Bağlam **sadece
@@ -101,25 +123,18 @@ Yarışma günü tek sohbette bitmez; birden çok oturum açılır. Bağlam **sa
 - Kişi azaldıysa: yeni FULL koşu açma, mevcut adayları tamamla ve ensemble'a git.
 
 ## Tekrarlanan hatalar
-- **Kernel başlığı = slug olmalı.** Kaggle, başlık kendi slugify'ıyla `id`'ye tam
-  dönüşmezse sessizce kendi ürettiği farklı bir slug kullanır; `status`/`fetch` o zaman
-  yanıltıcı "izin reddedildi" hatasıyla patlar. `kx.py` başlığı zaten `= slug` yapıyor ve
-  push sonrası otomatik doğruluyor — elle `kernel-metadata.json` düzenleme.
-- **`/kaggle/input/` yolu sabit değil.** Notebook editöründe düz `/kaggle/input/<slug>/`,
-  `kaggle kernels push` ile (CLI/batch) başlatılan koşularda ise iç içe
-  `/kaggle/input/competitions/<slug>/` ve `/kaggle/input/datasets/<owner>/<slug>/` olabilir.
-  Şablon artık `rglob` ile arıyor, sabit yol yazma.
-- **`status` "RUNNING" derken koşu gerçekte bitmiş olabilir** (prova: ~19 dk gecikme
-  görüldü). `runtime_min` sadece notebook-içi süreyi ölçer, Kaggle kuyruk+son-işleme
-  süresini içermez. `status` COMPLETE demeden de `fetch` dene — sonuç gerçekten yoksa
-  doğrulama zaten reddeder, zararı olmaz. FULL koşu zamanlamasında bu payı hesaba kat.
+- **`/kaggle/input/` yolu sabit değil.** Notebook editöründe düz `/kaggle/input/<slug>/`
+  olur ama iç içe dizinler de görülür. `code_template.py` `rglob` ile arıyor — sabit yol yazma.
+- **Fold parmak izi tutmuyorsa sonuç kayda girmez.** Kaggle'a dataset yüklenmediği için
+  fold garantisi dosya paylaşımı değil, `core/folds_snippet.py`'nin aynen gömülmesi +
+  parmak izi eşitliğidir. `code.py` içindeki fold bloğu elle düzenlenirse bütün geçmiş
+  karşılaştırmalar geçersiz olur.
 - **Kaggle'ın sklearn sürümü yerelden farklı olabilir** (provada 1.6.1 vs yerel 1.9.1).
-  İndirilen `model.pkl` yerelde `pickle.load` ile açılamayabilir. Final kapısı madde 5
-  ("model temiz oturumda yüklendi mi") bunu **aynı ortamda** (Kaggle notebook içinde veya
-  eşleşen sklearn sürümüyle) test etsin, yerel farklı sürümle "açılmadı" diye YANLIŞ RED verme.
+  Yerelde açılmayan bir `model.pkl` için "açılmadı" diye YANLIŞ RED verme; final kapısı
+  madde 5 bunu **aynı ortamda** test eder.
 - **Deney açmadan önce gerçekten `log/BACKLOG.md`'ye yaz.** Provada bir TRAPS bulgusu
-  backlog'a hiç girmeden doğrudan `kx.py new` ile denendi; `EXP-xxx` skill'in "dört satır
-  yoksa açma" kuralı sözde kaldı. Backlog boşsa önce oraya yaz, sonra deneyi aç.
-- **`kx.py fetch` `EXP_SUMMARY.md`'deki "Karar" sütununu doldurmaz** — bu insan/ajanın
-  `cmp` sonrası elle güncellemesi gereken bir alan. `card.md` güncellenince
-  `EXP_SUMMARY.md` satırını da aynı anda güncelle, unutma.
+  backlog'a hiç girmeden doğrudan denendi. Backlog boşsa önce oraya yaz, sonra deneyi aç.
+- **`kx.py kayit` `EXP_SUMMARY.md`'deki "Karar" sütununu doldurmaz** — bu `cmp` sonrası
+  elle güncellenir. `card.md` güncellenince `EXP_SUMMARY.md` satırını da aynı anda güncelle.
+- **Atlanan doğrulamayı sessizce geçme.** Dosyalar inmediyse `kayit` hangi kontrolleri
+  atladığını yazar; bunlar `card.md`'deki "Atlanan doğrulama" satırına geçer.

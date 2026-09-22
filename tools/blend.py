@@ -45,7 +45,7 @@ def load_truth() -> pd.DataFrame:
 def load_oof(exp_id: str, id_col: str) -> pd.Series:
     p = ROOT / "experiments" / exp_id / "output" / "oof.parquet"
     if not p.exists():
-        die(f"{exp_id}: oof.parquet yok. Once `kx.py fetch`.")
+        die(f"{exp_id}: oof.parquet yok. Ensemble icin OOF dosyalari gerekli - insan Kaggle Output'tan indirip experiments/{exp_id}/output/ altina koymali.")
     df = pd.read_parquet(p)
     if "id" not in df.columns:
         die(f"{exp_id}: oof.parquet'te 'id' kolonu yok.")

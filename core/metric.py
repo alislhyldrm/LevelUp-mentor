@@ -1,6 +1,7 @@
 """Resmi metrik. /case bunu yarismanin Evaluation sayfasindan yazar.
 Tek sozlesme: score(y_true, y_pred) -> float  +  GREATER_IS_BETTER
-Butun notebook'lar bunu hackathon-core dataset'inden okur, kendisi yazmaz.
+Bu dosyanin metni `kx.py new` tarafindan code.py'ye AYNEN gomulur; kod kendi
+metrigini yazmaz. Kaggle'a yuklenmez.
 """
 import numpy as np
 

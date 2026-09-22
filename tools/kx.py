@@ -1,44 +1,44 @@
 #!/usr/bin/env python
-"""kx - Kaggle deney dongusu.
+"""kx - deney dongusu (Kaggle'a GONDERIM YOK).
 
-Notebook uret -> Kaggle'a push -> durum -> ciktiyi indir + DOGRULA -> parent ile karsilastir.
-Insan kuryeligi yapmaz; dosya tasima islemi kalmaz.
+    kod uret -> insan Kaggle'da kosturur -> ekran ciktisi yapistirilir
+    -> DOGRULA -> parent ile karsilastir -> kaydet
 
 Komutlar:
-    kx.py new   EXP-017 --parent EXP-012 --note "target encoding" [--owner codex]
-    kx.py push  EXP-017 [--gpu] [--internet] [--dataset user/slug ...]
-    kx.py status [EXP-017]
-    kx.py fetch EXP-017
-    kx.py cmp   EXP-017
-    kx.py board
+    kx.py new   EXP-017 --parent EXP-012 --note "charging_total" [--target ... --id-col ...]
+    kx.py kayit EXP-017            # output/ icindekini dogrula + EXP_SUMMARY'ye yaz
+    kx.py cmp   EXP-017            # parent ile fold fold karsilastir
+    kx.py board                    # tek ekran
 
-Ayarlar: repo kokundeki kx.json. Eksikse `kx.py board` sablonunu yazar.
-Submit YOK. Bu betik hicbir kosulda Kaggle'a gonderim yapmaz.
+Bu betik Kaggle CLI'yi HIC cagirmaz: ne kernel push, ne dataset yukleme, ne gonderim.
+Kaggle'a giden tek sey, insanin notebook'a kendi elleriyle yapistirdigi koddur.
+Ayarlar: repo kokundeki kx.json.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import re
-import shutil
-import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "kx.json"
-SLUGS_PATH = ROOT / "log" / "slugs.json"
 RUNS_PATH = ROOT / "log" / "RUNS.md"
 SUMMARY_PATH = ROOT / "experiments" / "EXP_SUMMARY.md"
 FOLDS_PATH = ROOT / "core" / "folds.csv"
-TEMPLATE_PATH = ROOT / "tools" / "notebook_template.ipynb"
+SNIPPET_PATH = ROOT / "core" / "folds_snippet.py"
+METRIC_PATH = ROOT / "core" / "metric.py"
+TEMPLATE_PATH = ROOT / "tools" / "code_template.py"
 
 CONFIG_TEMPLATE = {
-    "username": "",
     "initials": "as",
     "competition": "",
-    "core_dataset": "",
+    "target": "",
+    "id_col": "id",
+    "pos_label": "",
+    "sample_submission": "data/sample_submission.csv",
     "main_score": "cv_mean",
     "greater_is_better": True,
 }
@@ -58,35 +58,11 @@ def now() -> str:
 def load_config() -> dict:
     if not CONFIG_PATH.exists():
         CONFIG_PATH.write_text(json.dumps(CONFIG_TEMPLATE, indent=2), encoding="utf-8")
-        die(f"{CONFIG_PATH.name} yoktu, sablon yazildi. username ve competition alanlarini doldur.")
+        die(f"{CONFIG_PATH.name} yoktu, sablon yazildi. Alanlari doldur.")
     cfg = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    for key in ("username", "initials"):
-        if not cfg.get(key):
-            die(f"kx.json icinde '{key}' bos. Doldur.")
+    if not cfg.get("initials"):
+        die("kx.json icinde 'initials' bos. Tek ortak hesapta slug cakismasini bu onler.")
     return cfg
-
-
-def load_slugs() -> dict:
-    if SLUGS_PATH.exists():
-        return json.loads(SLUGS_PATH.read_text(encoding="utf-8"))
-    return {}
-
-
-def save_slugs(data: dict) -> None:
-    SLUGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    SLUGS_PATH.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
-
-
-def kaggle(*args: str, check: bool = True, timeout: int = 180) -> subprocess.CompletedProcess:
-    exe = shutil.which("kaggle")
-    if not exe:
-        die("kaggle CLI bulunamadi. `pip install kaggle` ve token kurulumu gerekli.")
-    proc = subprocess.run(
-        [exe, *args], capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace"
-    )
-    if check and proc.returncode != 0:
-        die(f"kaggle {' '.join(args)}\n{proc.stdout}\n{proc.stderr}")
-    return proc
 
 
 def exp_dir(exp_id: str) -> Path:
@@ -110,6 +86,7 @@ def owner_of(exp_id: str) -> str:
 
 
 def slug_for(exp_id: str, cfg: dict) -> str:
+    """Kaggle notebook adi. Tek ortak hesapta 6 kisi calisiyor - cakisma olmasin."""
     tag = "cx" if owner_of(exp_id) == "codex" else "cl"
     return f"{cfg['initials']}-{tag}-exp-{exp_number(exp_id):03d}"
 
@@ -127,216 +104,10 @@ def read_result(exp_id: str) -> dict | None:
 def append_line(path: Path, line: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     text = path.read_text(encoding="utf-8") if path.exists() else ""
-    if not text.endswith("\n"):
+    if text and not text.endswith("\n"):
         text += "\n"
     path.write_text(text + line + "\n", encoding="utf-8")
 
-
-# ---------------------------------------------------------------------- new
-
-MINIMAL_NOTEBOOK = {
-    "cells": [],
-    "metadata": {
-        "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
-        "language_info": {"name": "python"},
-    },
-    "nbformat": 4,
-    "nbformat_minor": 5,
-}
-
-
-def md_cell(source: str) -> dict:
-    return {"cell_type": "markdown", "metadata": {}, "source": source.splitlines(keepends=True)}
-
-
-def cmd_new(args, cfg) -> None:
-    exp_id = normalize_exp(args.exp)
-    parent = normalize_exp(args.parent) if args.parent else "-"
-    d = exp_dir(exp_id)
-    if d.exists():
-        die(f"{exp_id} zaten var. Sonucu alinmis deney degistirilmez, yeni deney ac (CLAUDE.md kural 4).")
-    d.mkdir(parents=True)
-    (d / "output").mkdir()
-
-    owner = owner_of(exp_id)
-    slug = slug_for(exp_id, cfg)
-
-    if TEMPLATE_PATH.exists():
-        raw = TEMPLATE_PATH.read_text(encoding="utf-8")
-        for token, value in (
-            ("__EXP_ID__", exp_id),
-            ("__PARENT__", parent),
-            ("__OWNER__", owner),
-            ("__SLUG__", slug),
-            ("__NOTE__", (args.note or "TODO").replace('"', "'")),
-        ):
-            raw = raw.replace(token, value)
-        nb = json.loads(raw)
-    else:
-        nb = json.loads(json.dumps(MINIMAL_NOTEBOOK))
-        print(f"UYARI: {TEMPLATE_PATH.name} yok, bos notebook uretildi.")
-
-    meta = (
-        f"# {exp_id}\n"
-        f"- parent: {parent}\n"
-        f"- owner: {owner}\n"
-        f"- slug: {slug}\n"
-        f"- hipotez: {args.note or 'TODO'}\n"
-        f"- mod: FAST | FULL (sec)\n"
-        f"- seed: 42\n"
-        f"- GPU: hayir | internet: hayir\n"
-        f"- eklenecek girdiler: hackathon-core\n"
-        f"- tahmini sure: TODO-TODO dk (tek sayi degil, aralik)\n"
-    )
-    nb["cells"].insert(0, md_cell(meta))
-    (d / "notebook.ipynb").write_text(json.dumps(nb, indent=1, ensure_ascii=False), encoding="utf-8")
-
-    card = (
-        f"# {exp_id}  (parent: {parent} | kesif? hayir)\n"
-        f"- Owner: {owner} | Slug: {slug} | Kaggle versiyon: - | Kosu: hazirlaniyor\n"
-        f"- Hipotez: {args.note or 'TODO'}\n"
-        f"- Degisiklik: TODO (parent'a gore tam olarak ne)\n"
-        f"- Mod/Seed/GPU: TODO / 42 / hayir\n"
-        f"- Sonuc: -\n"
-        f"- Karar: -\n"
-        f"- Codex incelemesi: yok\n"
-        f"- Ders: -\n"
-    )
-    (d / "card.md").write_text(card, encoding="utf-8")
-
-    metadata = {
-        "id": f"{cfg['username']}/{slug}",
-        # BASLIK = SLUG, baska bir sey degil. Kaggle kernel'in GERCEK slug'ini
-        # id alanindan degil, baslikten kendi slugify'iyla turetir; ikisi
-        # uyusmazsa Kaggle sessizce KENDI slug'ini kullanir ve id yoksayilir
-        # (provada yakalandi: not metinli baslik -> beklenmedik slug -> status/
-        # fetch "permission denied" gibi yaniltici hatayla patlar). Hipotez notu
-        # card.md'de zaten var; baslikte tekrar etmeye gerek yok.
-        "title": slug,
-        "code_file": "notebook.ipynb",
-        "language": "python",
-        "kernel_type": "notebook",
-        "is_private": True,
-        "enable_gpu": False,
-        "enable_tpu": False,
-        "enable_internet": False,
-        "dataset_sources": [s for s in [cfg.get("core_dataset")] if s],
-        "competition_sources": [s for s in [cfg.get("competition")] if s],
-        "kernel_sources": [],
-        "model_sources": [],
-    }
-    (d / "kernel-metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-
-    print(f"{exp_id} olusturuldu  ->  {d}")
-    print(f"  owner={owner}  slug={slug}  parent={parent}")
-    print("  Siradaki: notebook.ipynb'i doldur, sonra `kx.py push` et.")
-
-
-# --------------------------------------------------------------------- push
-
-def slug_exists_remotely(slug: str, cfg: dict) -> bool:
-    proc = kaggle("kernels", "status", f"{cfg['username']}/{slug}", check=False, timeout=90)
-    out = (proc.stdout + proc.stderr).lower()
-    return proc.returncode == 0 and "404" not in out and "not found" not in out
-
-
-def check_notebook_syntax(nb_path: Path) -> None:
-    """Her kod hucresini ast.parse ile denetler - push'tan once, saniyeler icinde.
-    Provada bulundu: bir syntax hatasi Kaggle kuyruguna girip ~5 dk sonra
-    hata olarak dondu. Bunu yerelde yakalamak o turu tamamen ortadan kaldirir."""
-    import ast
-
-    nb = json.loads(nb_path.read_text(encoding="utf-8"))
-    errs = []
-    for i, c in enumerate(nb.get("cells", [])):
-        if c.get("cell_type") != "code":
-            continue
-        src = "".join(c.get("source", []))
-        try:
-            ast.parse(src)
-        except SyntaxError as e:
-            errs.append(f"  hucre {i}, satir {e.lineno}: {e.msg}\n    {(e.text or '').strip()}")
-    if errs:
-        die("notebook.ipynb'de syntax hatasi var, push edilmedi:\n" + "\n".join(errs))
-
-
-def cmd_push(args, cfg) -> None:
-    exp_id = normalize_exp(args.exp)
-    d = exp_dir(exp_id)
-    meta_path = d / "kernel-metadata.json"
-    if not meta_path.exists():
-        die(f"{exp_id} icin kernel-metadata.json yok. Once `kx.py new`.")
-
-    check_notebook_syntax(d / "notebook.ipynb")
-
-    slug = slug_for(exp_id, cfg)
-    metadata = json.loads(meta_path.read_text(encoding="utf-8"))
-
-    # --- kimlik dogrulamasi: paylasilan hesapta ustune yazma felaketini onler
-    expected_id = f"{cfg['username']}/{slug}"
-    if metadata.get("id") != expected_id:
-        die(f"kernel-metadata.json id '{metadata.get('id')}' beklenen '{expected_id}' degil. Elle duzeltme yapma, `kx.py new` kullan.")
-
-    slugs = load_slugs()
-    if slug in slugs and slugs[slug] != exp_id:
-        die(f"'{slug}' slug'i {slugs[slug]} deneyine kayitli. {exp_id} icin push durduruldu.")
-    if slug not in slugs and slug_exists_remotely(slug, cfg):
-        die(
-            f"'{slug}' Kaggle hesabinda ZATEN VAR ama yerel kaydi yok.\n"
-            "  Paylasilan hesapta baskasinin kosusunun ustune yazilabilir.\n"
-            f"  Kontrol et: kaggle kernels status {expected_id}"
-        )
-
-    metadata["enable_gpu"] = bool(args.gpu)
-    metadata["enable_internet"] = bool(args.internet)
-    for ds in args.dataset or []:
-        if ds not in metadata["dataset_sources"]:
-            metadata["dataset_sources"].append(ds)
-    meta_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-
-    print(f"push: {expected_id}  gpu={args.gpu}  internet={args.internet}")
-    proc = kaggle("kernels", "push", "-p", str(d), timeout=600)
-    print(proc.stdout.strip())
-    if "does not resolve to the specified id" in (proc.stdout + proc.stderr):
-        print(f"UYARI: Kaggle baslik/id uyumsuzlugu bildirdi. Gercek slug '{slug}' olmayabilir.")
-
-    # Push "basarili" desin bile, Kaggle GERCEKTE farkli bir slug uretmis olabilir
-    # (baslik id'ye tam slugify olmuyorsa). Burada dogrulanmazsa hata ilk `fetch`'te,
-    # yanlis dosya beklerken cikar - o zaman teshisi cok daha zor.
-    check = kaggle("kernels", "status", expected_id, check=False, timeout=60)
-    if check.returncode != 0:
-        real = kaggle("kernels", "list", "--mine", "--search", slug, check=False, timeout=60)
-        die(
-            f"push sonrasi '{expected_id}' erisilemiyor - Kaggle farkli bir slug uretmis olabilir.\n"
-            f"  {check.stdout.strip() or check.stderr.strip()}\n"
-            f"  '{slug}' icin bulunanlar:\n  {real.stdout.strip()[:400]}"
-        )
-
-    slugs[slug] = exp_id
-    save_slugs(slugs)
-
-    append_line(
-        RUNS_PATH,
-        f"| {slug} | {owner_of(exp_id)} | {now()} | {'evet' if args.gpu else 'hayir'} | ? | kosuyor |",
-    )
-    print(f"log/RUNS.md guncellendi. Durum: `kx.py status {exp_id}`")
-
-
-# ------------------------------------------------------------------- status
-
-def cmd_status(args, cfg) -> None:
-    targets = [normalize_exp(args.exp)] if args.exp else sorted(load_slugs().values())
-    if not targets:
-        print("Kayitli kosu yok.")
-        return
-    for exp_id in targets:
-        slug = slug_for(exp_id, cfg)
-        proc = kaggle("kernels", "status", f"{cfg['username']}/{slug}", check=False, timeout=90)
-        line = (proc.stdout or proc.stderr).strip().replace("\n", " ")
-        print(f"{exp_id:9} {slug:24} {line[:100]}")
-
-
-# -------------------------------------------------------------------- fetch
 
 def _read_table(path: Path):
     import pandas as pd
@@ -344,19 +115,172 @@ def _read_table(path: Path):
     return pd.read_parquet(path) if path.suffix == ".parquet" else pd.read_csv(path)
 
 
-def validate_output(exp_id: str, out: Path) -> list[str]:
-    """Bolum 4.2 sozlesmesi. Donen liste bossa sonuc kayda girebilir."""
+def local_fingerprint() -> str | None:
+    """core/folds.csv'nin parmak izi. Kaggle kosusu ayni izi basmali."""
+    if not FOLDS_PATH.exists() or not SNIPPET_PATH.exists():
+        return None
+    sys.path.insert(0, str(SNIPPET_PATH.parent))
+    try:
+        import numpy as np
+        from folds_snippet import fold_fingerprint
+
+        folds = _read_table(FOLDS_PATH)
+        return fold_fingerprint(np.asarray(folds["fold"], dtype="int64"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"UYARI: yerel fold parmak izi hesaplanamadi: {exc}")
+        return None
+
+
+# ---------------------------------------------------------------------- new
+
+def cmd_new(args, cfg) -> None:
+    exp_id = normalize_exp(args.exp)
+    parent = normalize_exp(args.parent) if args.parent else "-"
+    d = exp_dir(exp_id)
+    if d.exists():
+        die(f"{exp_id} zaten var. Sonucu alinmis deney degistirilmez, yeni deney ac (CLAUDE.md kural 4).")
+
+    if not TEMPLATE_PATH.exists():
+        die(f"{TEMPLATE_PATH} yok. Sablon olmadan deney acilmaz.")
+    if not SNIPPET_PATH.exists():
+        die(f"{SNIPPET_PATH} yok. Fold sozlesmesi olmadan deney acilmaz (once D-01).")
+    if not METRIC_PATH.exists():
+        die(f"{METRIC_PATH} yok. Metrik olmadan deney acilmaz (once D-01).")
+
+    d.mkdir(parents=True)
+    (d / "output").mkdir()
+
+    owner = owner_of(exp_id)
+    slug = slug_for(exp_id, cfg)
+    note = (args.note or "TODO").replace('"', "'")
+
+    code = TEMPLATE_PATH.read_text(encoding="utf-8")
+    for token, value in (
+        ("__FOLD_SNIPPET__", SNIPPET_PATH.read_text(encoding="utf-8").strip()),
+        ("__METRIC_SNIPPET__", METRIC_PATH.read_text(encoding="utf-8").strip()),
+        ("__EXP_ID__", exp_id),
+        ("__PARENT__", parent),
+        ("__OWNER__", owner),
+        ("__SLUG__", slug),
+        ("__NOTE__", note),
+        ("__TARGET__", args.target or cfg.get("target", "")),
+        ("__IDCOL__", args.id_col or cfg.get("id_col", "id")),
+        ("__POS_LABEL__", args.pos_label if args.pos_label is not None else cfg.get("pos_label", "")),
+    ):
+        code = code.replace(token, value)
+    (d / "code.py").write_text(code, encoding="utf-8")
+
+    (d / "card.md").write_text(
+        f"# {exp_id}  (parent: {parent} | kesif? hayir)\n"
+        f"- Owner: {owner} | Kaggle notebook adi: {slug} | Kosu: hazirlaniyor\n"
+        f"- Backlog maddesi: TODO (B-xx)\n"
+        f"- Hipotez: {note}\n"
+        f"- Dayanak: TODO (bu veride olculen gozlem)\n"
+        f"- Degisiklik: TODO (parent'a gore tam olarak ne - diff.md'de satir satir)\n"
+        f"- Mod/Seed/GPU: FULL / 42 / hayir\n"
+        f"- Tahmini sure: TODO-TODO dk\n"
+        f"- Sonuc: -\n"
+        f"- Karar: -\n"
+        f"- Atlanan dogrulama: -\n"
+        f"- Codex incelemesi: yok\n"
+        f"- Urun etkisi: -\n"
+        f"- Ders: -\n",
+        encoding="utf-8",
+    )
+
+    (d / "diff.md").write_text(
+        f"# {exp_id} - parent {parent} farki\n\n"
+        f"Insana kosudan ONCE gosterilen sey budur (CLAUDE.md: kod gorulmeden onay yok).\n\n"
+        f"```diff\nTODO\n```\n",
+        encoding="utf-8",
+    )
+
+    print(f"{exp_id} olusturuldu  ->  {d}")
+    print(f"  owner={owner}  parent={parent}  Kaggle notebook adi: {slug}")
+    print("  1. code.py'deki TODO'lari doldur (hazirla / model_kur)")
+    print("  2. diff.md'yi doldur ve INSANA GOSTER - onaysiz kosu yok")
+    print("  3. insan Kaggle'da kosturur, ekran ciktisini output/run_log.txt'ye koy")
+    print(f"  4. `kx.py kayit {exp_id}`")
+
+
+# -------------------------------------------------------------------- kayit
+
+RESULT_RE = re.compile(r"=== KX RESULT JSON ===\s*(\{.*?\})\s*=== KX RESULT SONU ===", re.S)
+
+
+def result_from_log(out: Path) -> dict | None:
+    """Insanin yapistirdigi ekran ciktisindan result.json'i cikarir."""
+    log = out / "run_log.txt"
+    if not log.exists():
+        return None
+    m = RESULT_RE.search(log.read_text(encoding="utf-8", errors="replace"))
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except json.JSONDecodeError as exc:
+        die(f"run_log.txt icindeki KX RESULT JSON blogu bozuk: {exc}")
+
+
+def validate_submission(path: Path, cfg: dict, errs: list[str], atlanan: list[str]) -> None:
+    """submission.csv'yi ornek dosyayla karsilastirir.
+
+    Erken gonderim yapilmadigi icin format hatasini yakalayan TEK mekanizma budur.
+    """
+    import numpy as np
+
+    ref_rel = cfg.get("sample_submission") or "data/sample_submission.csv"
+    ref = ROOT / ref_rel
+    if not ref.exists():
+        atlanan.append(f"submission formati (referans {ref_rel} yok)")
+        return
+    try:
+        sub, samp = _read_table(path), _read_table(ref)
+    except Exception as exc:  # noqa: BLE001
+        errs.append(f"submission.csv veya {ref_rel} okunamadi: {exc}")
+        return
+
+    if list(sub.columns) != list(samp.columns):
+        errs.append(f"submission.csv kolonlari {list(sub.columns)}, beklenen {list(samp.columns)}")
+        return
+    if len(sub) != len(samp):
+        errs.append(f"submission.csv {len(sub)} satir, beklenen {len(samp)}")
+        return
+    idc = samp.columns[0]
+    if not sub[idc].equals(samp[idc]):
+        if set(sub[idc]) == set(samp[idc]):
+            errs.append(f"submission.csv: id kumesi dogru ama SIRA farkli ({idc})")
+        else:
+            eksik = len(set(samp[idc]) - set(sub[idc]))
+            errs.append(f"submission.csv: id kumesi tutmuyor ({eksik} id eksik)")
+        return
+    for c in samp.columns[1:]:
+        if sub[c].isna().any():
+            errs.append(f"submission.csv: '{c}' kolonunda NaN var ({int(sub[c].isna().sum())} satir)")
+            continue
+        try:
+            vals = sub[c].to_numpy(dtype="float64")
+        except (TypeError, ValueError):
+            continue  # sayisal olmayan hedef (etiket) - aralik kontrolu yok
+        if not np.isfinite(vals).all():
+            errs.append(f"submission.csv: '{c}' kolonunda inf var")
+
+
+def validate_output(exp_id: str, out: Path, cfg: dict) -> tuple[list[str], list[str]]:
+    """Cikti sozlesmesi (core/cv_spec.md). errs bossa sonuc kayda girebilir.
+
+    Dosya indirilmediyse (yalniz ekran ciktisi yapistirildiysa) dosyaya bagli
+    kontroller 'atlanan' listesine girer - sessizce gecilmez, card.md'ye yazilir.
+    """
     errs: list[str] = []
+    atlanan: list[str] = []
     result = read_result(exp_id)
     if result is None:
-        return [f"result.json yok ({out / 'result.json'})"]
+        return [f"result.json yok ve run_log.txt'den uretilemedi ({out})"], atlanan
 
-    # FAST sabit bir alt kumede kosar (core/cv_spec.md): satir ve fold sayisi
-    # bilerek eksiktir. Tam CV kontrolleri yalniz FULL icin uygulanir.
     is_full = str(result.get("mode", "")).upper() == "FULL"
 
-    expected_rows = None
-    expected_folds = None
+    expected_rows = expected_folds = None
     if FOLDS_PATH.exists():
         try:
             folds = _read_table(FOLDS_PATH)
@@ -365,23 +289,39 @@ def validate_output(exp_id: str, out: Path) -> list[str]:
                 expected_folds = int(folds["fold"].nunique())
         except Exception as exc:  # noqa: BLE001
             errs.append(f"core/folds.csv okunamadi: {exc}")
+    else:
+        atlanan.append("fold sayisi / satir hizalamasi (core/folds.csv yok)")
+
+    # --- fold parmak izi: Kaggle'a dataset yuklemenin yerine gecen garanti
+    fp_local = local_fingerprint()
+    fp_run = result.get("fold_fingerprint")
+    if fp_local is None:
+        atlanan.append("fold parmak izi (yerel folds.csv veya folds_snippet.py yok)")
+    elif not fp_run:
+        errs.append("result.json: 'fold_fingerprint' yok - kosu fold sozlesmesini uygulamamis")
+    elif fp_run != fp_local:
+        errs.append(
+            f"FOLD PARMAK IZI TUTMUYOR: kosu={fp_run} yerel={fp_local}. "
+            "Kosu baska fold'larla egitilmis - sonuc onceki deneylerle karsilastirilamaz."
+        )
 
     for name, need_rows in (("oof.parquet", True), ("test_preds.parquet", False)):
         path = out / name
         if not path.exists():
-            errs.append(f"{name} yok")
+            atlanan.append(f"{name} kontrolu (dosya indirilmedi)")
             continue
         try:
             df = _read_table(path)
         except Exception as exc:  # noqa: BLE001
             errs.append(f"{name} okunamadi: {exc}")
             continue
-        if "id" not in df.columns:
-            errs.append(f"{name}: 'id' kolonu yok (kimliksiz tahmin yasak)")
+        idc = "id" if "id" in df.columns else (cfg.get("id_col") or "id")
+        if idc not in df.columns:
+            errs.append(f"{name}: '{idc}' kolonu yok (kimliksiz tahmin yasak)")
             continue
-        if df["id"].duplicated().any():
-            errs.append(f"{name}: tekrar eden id var ({int(df['id'].duplicated().sum())} satir)")
-        pred_cols = [c for c in df.columns if c not in ("id", "fold")]
+        if df[idc].duplicated().any():
+            errs.append(f"{name}: tekrar eden id var ({int(df[idc].duplicated().sum())} satir)")
+        pred_cols = [c for c in df.columns if c not in (idc, "fold", "y")]
         if not pred_cols:
             errs.append(f"{name}: tahmin kolonu yok")
         elif df[pred_cols].isna().any().any():
@@ -389,16 +329,18 @@ def validate_output(exp_id: str, out: Path) -> list[str]:
         if need_rows and is_full and expected_rows is not None and len(df) != expected_rows:
             errs.append(f"{name}: {len(df)} satir, folds.csv {expected_rows} satir - hizalama bozuk")
 
-    if not (out / "submission.csv").exists():
-        errs.append("submission.csv yok")
+    sub_path = out / "submission.csv"
+    if sub_path.exists():
+        validate_submission(sub_path, cfg, errs, atlanan)
+    else:
+        atlanan.append("submission formati (submission.csv indirilmedi)")
 
     for field in ("exp_id", "cv_mean", "cv_oof", "fold_scores", "n_folds_done"):
         if field not in result:
             errs.append(f"result.json: '{field}' alani yok")
 
-    # Skorlar sonlu olmali. Provada olculdu: sklearn roc_auc_score tek sinifli bir
-    # dilimde hata vermez, NAN doner. Kucuk FAST fold'lari veya nadir sinif dilimleri
-    # boyle bir skoru sessizce kayda sokabilir.
+    # Skorlar sonlu olmali. Provada olculdu: roc_auc_score tek sinifli bir dilimde
+    # hata vermez, NAN doner; kucuk FAST fold'lari bunu sessizce kayda sokabilir.
     def _finite(v) -> bool:
         return isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) != float("inf")
 
@@ -415,25 +357,33 @@ def validate_output(exp_id: str, out: Path) -> list[str]:
     if result.get("exp_id") not in (None, exp_id):
         errs.append(f"result.json exp_id '{result.get('exp_id')}' klasor {exp_id} ile uyusmuyor")
     if is_full and expected_folds is not None and result.get("n_folds_done") not in (None, expected_folds):
-        errs.append(f"result.json n_folds_done={result.get('n_folds_done')}, beklenen {expected_folds} - FULL kosuda eksik fold")
+        errs.append(
+            f"result.json n_folds_done={result.get('n_folds_done')}, beklenen {expected_folds} - FULL kosuda eksik fold"
+        )
     if not result.get("mode"):
         errs.append("result.json: 'mode' alani yok (FAST/FULL ayrimi yapilamaz)")
-    return errs
+    return errs, atlanan
 
 
-def cmd_fetch(args, cfg) -> None:
+def cmd_kayit(args, cfg) -> None:
     exp_id = normalize_exp(args.exp)
     d = exp_dir(exp_id)
     if not d.exists():
-        die(f"{exp_id} klasoru yok.")
+        die(f"{exp_id} klasoru yok. Once `kx.py new {exp_id}`.")
     out = d / "output"
     out.mkdir(exist_ok=True)
-    slug = slug_for(exp_id, cfg)
 
-    print(f"indiriliyor: {cfg['username']}/{slug} -> {out}")
-    kaggle("kernels", "output", f"{cfg['username']}/{slug}", "-p", str(out), timeout=900)
+    if not (out / "result.json").exists():
+        parsed = result_from_log(out)
+        if parsed is None:
+            die(
+                f"{out}/result.json yok ve {out}/run_log.txt'de KX RESULT JSON blogu bulunamadi.\n"
+                "  Insanin yapistirdigi ekran ciktisini run_log.txt'ye kaydet, sonra tekrar dene."
+            )
+        (out / "result.json").write_text(json.dumps(parsed, indent=2), encoding="utf-8")
+        print(f"run_log.txt'den result.json uretildi ({out / 'result.json'})")
 
-    errs = validate_output(exp_id, out)
+    errs, atlanan = validate_output(exp_id, out, cfg)
     if errs:
         print("\nDOGRULAMA BASARISIZ - sonuc kayda GIRMEDI:")
         for e in errs:
@@ -445,17 +395,26 @@ def cmd_fetch(args, cfg) -> None:
     main_key = cfg.get("main_score", "cv_mean")
     score = result.get(main_key)
     folds = result.get("fold_scores") or []
-    row = (
+    append_line(
+        SUMMARY_PATH,
         f"| {exp_id} | {result.get('owner', owner_of(exp_id))} | {result.get('parent', '-')} "
         f"| {result.get('mode', '-')} | {score} | {result.get('cv_mean')} | {result.get('cv_oof')} "
         f"| {len(folds)} | {result.get('runtime_min', '-')} | - "
-        f"| {result.get('kernel_slug', slug)} / v{result.get('kernel_version', '?')} |"
+        f"| {result.get('fold_fingerprint', '?')} |",
     )
-    append_line(SUMMARY_PATH, row)
+    append_line(
+        RUNS_PATH,
+        f"| {slug_for(exp_id, cfg)} | {result.get('owner', owner_of(exp_id))} | {now()} "
+        f"| {result.get('mode', '-')} | {result.get('runtime_min', '?')} | bitti |",
+    )
 
     print(f"\nDOGRULAMA GECTI. {exp_id} ana skor ({main_key}): {score}")
     print(f"fold skorlari: {folds}")
-    print(f"EXP_SUMMARY.md guncellendi. Siradaki: `kx.py cmp {exp_id}`")
+    if atlanan:
+        print("\nATLANAN DOGRULAMALAR (card.md'ye yaz, sessizce gecme):")
+        for a in atlanan:
+            print(f"  - {a}")
+    print(f"\nEXP_SUMMARY.md + RUNS.md guncellendi. Siradaki: `kx.py cmp {exp_id}`")
 
 
 # ---------------------------------------------------------------------- cmp
@@ -475,7 +434,7 @@ def cmd_cmp(args, cfg) -> None:
     exp_id = normalize_exp(args.exp)
     child = read_result(exp_id)
     if child is None:
-        die(f"{exp_id} icin result.json yok. Once `kx.py fetch`.")
+        die(f"{exp_id} icin result.json yok. Once `kx.py kayit {exp_id}`.")
 
     parent_id = args.parent or child.get("parent")
     if not parent_id or parent_id == "-":
@@ -488,6 +447,10 @@ def cmd_cmp(args, cfg) -> None:
     if child.get("mode") != parent.get("mode"):
         print(f"UYARI: modlar farkli ({child.get('mode')} vs {parent.get('mode')}). "
               "FAST sonuclari yalniz FAST ile karsilastirilir.")
+    cfp, pfp = child.get("fold_fingerprint"), parent.get("fold_fingerprint")
+    if cfp and pfp and cfp != pfp:
+        print(f"UYARI: fold parmak izleri farkli ({cfp} vs {pfp}). "
+              "Iki kosu ayni fold'larda degil - fark modelden degil bolunmeden gelebilir.")
 
     key = cfg.get("main_score", "cv_mean")
     other_key = "cv_oof" if key == "cv_mean" else "cv_mean"
@@ -506,23 +469,20 @@ def cmd_cmp(args, cfg) -> None:
     print(f"  fark: {main_diff:+.6f}")
 
     # Diger skor bilgi amacli her zaman gosterilir; secilmedi diye kaybolmaz.
-    # Iki skor zit yone isaret ediyorsa (biri iyilesme, digeri kotulesme derse)
-    # otomatik oneri bunu gormez - insan burada uyarilir.
     co, po = child.get(other_key), parent.get(other_key)
     if co is not None and po is not None:
         other_diff = (co - po) * sign
         print(f"  ({other_key}: {exp_id}={co}  {parent_id}={po}  fark={other_diff:+.6f})")
         if main_diff != 0 and other_diff != 0 and (main_diff > 0) != (other_diff > 0):
             print(f"\n  UYARI: {key} ve {other_key} ZIT yone isaret ediyor "
-                  f"({key} {'iyilesme' if main_diff>0 else 'kotulesme'}, "
-                  f"{other_key} {'iyilesme' if other_diff>0 else 'kotulesme'}). "
+                  f"({key} {'iyilesme' if main_diff > 0 else 'kotulesme'}, "
+                  f"{other_key} {'iyilesme' if other_diff > 0 else 'kotulesme'}). "
                   "Otomatik oneri yalniz ana skora bakar - karari vermeden once ikisine de bak.")
 
     suggestion = "kanit yetersiz - fold skorlari eksik"
     if len(cf) == len(pf) and cf:
         diffs = [(c - p) * sign for c, p in zip(cf, pf)]
-        sd = _std(diffs)
-        md = _mean(diffs)
+        sd, md = _std(diffs), _mean(diffs)
         print("\n  fold | " + parent_id + " | " + exp_id + " | fark")
         for i, (p, c, dd) in enumerate(zip(pf, cf, diffs)):
             print(f"  {i:>4} | {p:>10.6f} | {c:>10.6f} | {dd:+.6f}")
@@ -540,7 +500,8 @@ def cmd_cmp(args, cfg) -> None:
             suggestion += "  (fark kucuk: daha basit/hizli model korunur)"
 
     print(f"\n  ONERI: {suggestion}")
-    print(f"  Karari insan verir. card.md'ye yaz, STATUS.md'yi guncelle.")
+    print("  Karari insan verir. card.md'ye yaz, EXP_SUMMARY.md'deki Karar sutununu doldur,")
+    print("  STATUS.md'yi guncelle.")
 
 
 # -------------------------------------------------------------------- board
@@ -548,65 +509,55 @@ def cmd_cmp(args, cfg) -> None:
 def cmd_board(args, cfg) -> None:
     print(f"=== KX BOARD  {datetime.now().strftime('%a %H:%M')} ===\n")
 
-    slugs = load_slugs()
-    print("-- Kaggle'da kayitli kosular --")
-    if not slugs:
-        print("  (yok)")
-    else:
-        for slug, exp_id in sorted(slugs.items()):
-            proc = kaggle("kernels", "status", f"{cfg['username']}/{slug}", check=False, timeout=60)
-            line = (proc.stdout or proc.stderr).strip().replace("\n", " ")
-            print(f"  {exp_id:9} {slug:24} {line[:80]}")
-
-    print("\n-- Son sonuclar --")
+    print("-- Deneyler --")
     results = []
+    bekleyen = []
     for d in sorted((ROOT / "experiments").glob("EXP-*")):
         r = read_result(d.name)
         if r:
             results.append((d.name, r))
+        else:
+            bekleyen.append(d.name)
+    key = cfg.get("main_score", "cv_mean")
+    gib = bool(cfg.get("greater_is_better", True))
     if not results:
-        print("  (yok)")
+        print("  (sonuclanmis deney yok)")
     else:
-        key = cfg.get("main_score", "cv_mean")
-        gib = bool(cfg.get("greater_is_better", True))
         for name, r in results[-10:]:
-            print(f"  {name:9} {r.get('mode','-'):5} {key}={r.get(key)}  ({r.get('owner','-')})")
+            print(f"  {name:9} {r.get('mode', '-'):5} {key}={r.get(key)}  ({r.get('owner', '-')})")
         scored = [(n, r) for n, r in results if isinstance(r.get(key), (int, float))]
         if scored:
             best = (max if gib else min)(scored, key=lambda t: t[1][key])
             print(f"\n  EN IYI ADAY: {best[0]}  {key}={best[1][key]}")
+    if bekleyen:
+        print(f"\n-- Sonucu bekleyen (kosuldu mu?) --\n  {', '.join(bekleyen)}")
+
+    fp = local_fingerprint()
+    print(f"\n-- Fold sozlesmesi --\n  yerel parmak izi: {fp or '(folds.csv yok - once D-01 + make_folds.py)'}")
 
     print("\n-- Hatirlatma --")
-    print("  Submit etme. Oner, insan gonderir, log/SUBMISSIONS.md'ye yazilir.")
-    print("  GPU gerektirmeyen her sey CPU'da kosar.")
+    print("  Kaggle'a hicbir sey gonderilmez. Kodu insan yapistirir, insan kosturur.")
+    print("  Gonderim karari insanin. Oner; insan yaptiktan sonra log/SUBMISSIONS.md'ye yaz.")
 
 
 # --------------------------------------------------------------------- main
 
 def main() -> None:
-    p = argparse.ArgumentParser(prog="kx", description="Kaggle deney dongusu. Submit yapmaz.")
+    p = argparse.ArgumentParser(prog="kx", description="Deney dongusu. Kaggle'a gonderim yapmaz.")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    n = sub.add_parser("new", help="deney klasoru + notebook + kernel-metadata uret")
+    n = sub.add_parser("new", help="deney klasoru + yapistirilacak code.py uret")
     n.add_argument("exp")
     n.add_argument("--parent")
     n.add_argument("--note")
+    n.add_argument("--target")
+    n.add_argument("--id-col", dest="id_col")
+    n.add_argument("--pos-label", dest="pos_label")
     n.set_defaults(fn=cmd_new)
 
-    u = sub.add_parser("push", help="Kaggle'a batch kosu baslat")
-    u.add_argument("exp")
-    u.add_argument("--gpu", action="store_true")
-    u.add_argument("--internet", action="store_true")
-    u.add_argument("--dataset", action="append")
-    u.set_defaults(fn=cmd_push)
-
-    s = sub.add_parser("status", help="kosu durumlari")
-    s.add_argument("exp", nargs="?")
-    s.set_defaults(fn=cmd_status)
-
-    f = sub.add_parser("fetch", help="ciktiyi indir ve DOGRULA")
-    f.add_argument("exp")
-    f.set_defaults(fn=cmd_fetch)
+    k = sub.add_parser("kayit", help="yerel ciktiyi DOGRULA ve kaydet")
+    k.add_argument("exp")
+    k.set_defaults(fn=cmd_kayit)
 
     c = sub.add_parser("cmp", help="parent ile fold fold karsilastir")
     c.add_argument("exp")
