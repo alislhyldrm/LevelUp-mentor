@@ -3,9 +3,8 @@
 > Digital mentor for SİPER
 
 24 saatlik Kaggle yarışması için ajan sistemi. Bu depo bir model değil, bir
-**çalışma düzeni**. 24 saatlik bir Kaggle hekatonunda
-deneylerin rastgele değil sırayla, sonuçların karşılaştırılabilir, kararların da
-insanda kalmasını sağlıyor.
+**çalışma düzeni**: deneylerin rastgele değil sırayla yapılmasını, sonuçların
+karşılaştırılabilir olmasını ve kararların insanda kalmasını sağlıyor.
 
 Sistem üç ajanla çalışır: **insan** karar verir ve koşturur, **Claude Code** kodu yazıp
 doğrular ve kaydeder, **Codex** bağımsız ikinci uzman olarak beş sabit noktada devreye
