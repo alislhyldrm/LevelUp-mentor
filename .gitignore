@@ -1,0 +1,32 @@
+# veri — asla commit edilmez
+data/
+*.csv.zip
+*.parquet
+*.feather
+*.npy
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.bin
+*.h5
+*.onnx
+
+# ama sözleşme dosyaları kalsın
+!core/folds.csv
+
+# deney çıktıları (büyük); card.md ve result.json kalır
+experiments/*/output/**
+!experiments/*/output/result.json
+
+# Kaggle kimlik bilgileri
+kaggle.json
+credentials.json
+.kaggle/
+
+# python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
