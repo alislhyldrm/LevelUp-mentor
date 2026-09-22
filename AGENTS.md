@@ -11,3 +11,9 @@ Kısa hatırlatma:
   `case/CASE.md`) değiştirme. Sonucu yapılandırılmış döndür, merkezi kayda Claude işler.
 - Ölçülmemiş skor etkisini sayı olarak verme.
 - Kaggle'a submit etme.
+
+**Çağrı 4 (fikir üretimi) zorunlu bir adımdır, opsiyonel değil.** İlk baseline sonucu
+gelir gelmez, Claude başka deney açmadan önce bu çağrıyı yapar (`CLAUDE.md` →
+"Baseline'dan hemen sonra: liste zorunlu"). Bu çağrı geldiğinde en fazla 3 fikir,
+her biri dayanak + uygulanacak değişiklik + tahmini süre ile — ders kitabı cevabı değil,
+verilen case/TRAPS/baseline bulgularına gömülü, verilen bütçeye göre somut fikirler.

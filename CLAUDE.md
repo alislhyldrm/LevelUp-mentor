@@ -4,6 +4,18 @@
 İnsan karar verir ve submit eder. Sen notebook yazarsın, `kx.py` ile koşturursun,
 çıktıları doğrular, karşılaştırır ve kaydedersin. Sorulara dosyadan cevap verirsin.
 
+## Baseline'dan hemen sonra: liste zorunlu
+İlk baseline (`EXP-001` veya case'in ilk deneyi) skorunu aldıktan sonra, **başka hiçbir
+deney açmadan önce** `log/BACKLOG.md` doldurulur ve insana gösterilir:
+1. `CODEX.md` Çağrı 4'ü (fikir üretimi) çağır — girdi: `case/CASE.md` + `case/TRAPS.md`
+   bulguları + baseline sonucu. Bağımsız bir fikir listesi iste.
+2. Kendi bulgularını (TRAPS taraması, OOF hata analizi) da aynı listeye ekle.
+3. `log/BACKLOG.md`'yi doldur (ŞİMDİ/SONRA/BEKLE, dayanak sütunu boş bırakılmaz).
+4. **Listeyi insana göster** — dosyaya yazıp geçme, sohbette de ver.
+Boş backlog'dan deney açılmaz; tek bir ad-hoc fikri sırayı atlayıp test etmek de bu
+kuralı ihlal eder. Bu adım atlanırsa iterasyon rastgele baseline üstüne rastgele
+değişiklik olur — planın en başta reddettiği şey tam olarak budur (bkz. "Nasıl kazanılır").
+
 ## Nasıl kazanılır (bunu her deneyden önce oku)
 - **Rastgele baseline + üstüne rastgele değişiklik yok.** Her deney `log/BACKLOG.md`'den
   gelir ve tek bir hipotez taşır. Ana hat oturmadan önceki keşif deneyleri istisnadır;

@@ -31,7 +31,11 @@ Push etmeden önce `python tools/kx.py board` — kota ve eşzamanlı koşu limi
    - Her fold bitince skor basılır ve ara çıktı diske yazılır.
    - Mod (FAST/FULL) ve seed açıkça yazılır. FAST tanımı `core/cv_spec.md`'de sabittir.
    - Çıktılar sözleşmeye uyar; `artifacts/` hücresi silinmez.
-   Tamam: TODO kalmadı, mod ve tahmini süre aralığı `card.md`'de.
+   - **Push'tan önce insana göster:** parent'a göre hangi kod satırları değişti (feature,
+     model, hiperparametre — ne eklendiyse). Skor tek başına rapor değildir; insan neyin
+     denendiğini kodda görmeden onay vermiş sayılmaz. Uzun deney zincirlerinde (arka arkaya
+     birden fazla push/fetch) her adımı ayrı ayrı özetle, sona biriktirip tek seferde verme.
+   Tamam: TODO kalmadı, mod ve tahmini süre aralığı `card.md`'de, insan kod farkını gördü.
 
 3. **Riskliyse Codex'e incele.** Veri işleme, feature veya hedef değişkene dokunuyorsa
    `CODEX.md` Çağrı 2. Yalnız parametre değiştiyse atla.
