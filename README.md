@@ -7,8 +7,10 @@
 karşılaştırılabilir olmasını ve kararların insanda kalmasını sağlıyor.
 
 Sistem üç ajanla çalışır: **insan** karar verir ve koşturur, **Claude Code** kodu yazıp
-doğrular ve kaydeder, **Codex** bağımsız ikinci uzman olarak beş sabit noktada devreye
-girer.
+doğrular ve kaydeder (koordinatör), **Codex** bağımsız ikinci uzman olarak beş sabit
+noktada devreye girer. Claude'un limiti dolarsa Codex koordinatörlüğü devralır
+([`AGENTS.md`](AGENTS.md)). Takım arkadaşları kendi ajanlarıyla kod yazar; sonuçları
+[`SOZLESME.md`](SOZLESME.md) şartlarıyla ortak kayda girer.
 
 > **Kaggle'a hiçbir şey otomatik gönderilmez.** Ne notebook, ne dataset, ne submission.
 > Kaggle'dan yalnız yarışma verisi iner. Kaggle'a giden tek şey, insanın notebook
@@ -31,16 +33,16 @@ Bu üçüne hizmet etmeyen dosya kurulmaz.
 
 ```
 /case → ✋Onay 1 (CV + metrik) → baseline (Codex ile birlikte) → koşu: insan → skor
-      → OOF hata analizi + BACKLOG → ✋Onay 2 → /exp döngüsü → ensemble
+      → gürültü koşusu → OOF hata analizi + BACKLOG → ✋Onay 2 → /exp döngüsü → ensemble
       → /final kapısı → gönderim (insan)
 ```
 
 | Faz | Ne olur | Kim |
 |---|---|---|
 | 1 · Case | Ham sayfalar kaydedilir, 10 dakikalık triyaj, ürün bölümü, CV şeması | insan yapıştırır, Claude işler, Codex bağımsız denetler |
-| 2 · Baseline | Tek hücrelik kod yazılır, Kaggle'da koşar, ilk güvenilir skor alınır | Claude + Codex yazar, insan koşturur |
+| 2 · Baseline | Tek hücrelik kod yazılır, koşar, ilk güvenilir skor alınır; ardından yalnız seed'i farklı gürültü koşusu | Claude + Codex yazar, insan koşturur |
 | 3 · Liste | OOF hata analizi + önem sıralı backlog | Claude + Codex |
-| 4 · Döngü | Backlog sırasıyla 8–15 deney, her biri tek hipotez | üçü birlikte |
+| 4 · Döngü | Backlog sırasıyla 8–15 deney, her biri tek hipotez | üçü birlikte + takım arkadaşları (`SOZLESME.md`) |
 | 5 · Ensemble | OOF'lar indirilir, ağırlıklar bulunur | insan indirir, Claude hesaplar |
 | 6 · Final | Sabit 6 maddelik teslim kapısı | Claude + Codex, kararı insan verir |
 
@@ -62,6 +64,20 @@ göre kurulmaz.
 
 **Her koşu kendi onayı, kendi kaydı (K-08):** bir sonuca dayanan kod o sonuç kaydedildikten
 sonra verilir; paralel koşu yalnız insan isterse. Takım arkadaşlarının kodu için: `SOZLESME.md`.
+
+---
+
+## Takım
+
+| Kim | Deney numarası | Kaggle notebook adı |
+|---|---|---|
+| Claude (koordinatör) | `EXP-0xx`, `EXP-1xx` | `as-cl-exp-0xx` |
+| Codex | `EXP-2xx` | `as-cx-exp-2xx` |
+| Takım arkadaşı | `kx.json` → `owners` yüzlüğü (ör. `"3": "ay"` → `EXP-3xx`) | `ay-exp-3xx` |
+
+Takım arkadaşının kodu kendi sisteminde yazılır, insan koşturur, ekran çıktısının tamamı
+koordinatöre verilir. Fold parmak izi tutan sonuç kayda ve ensemble havuzuna girer.
+Şartlar ve teknik kuralları: [`SOZLESME.md`](SOZLESME.md).
 
 ---
 
@@ -128,7 +144,7 @@ iz değişir; bölmenin sessizce kayması böyle yakalanır.
 | Tüm fold'larda iyileşme **veya** ortalama fark fold sapmasından belirgin büyük | **KABUL** — yeni ana hat |
 | Ortalama pozitif, tutarsız | **HAVUZ** — ensemble adayı, ana hat değişmez |
 | Ortalama negatif | **RED** — OOF yine saklanır |
-| Fark küçük | Daha basit/hızlı model korunur |
+| Fark küçük veya gürültü tabanı içinde (`kx.json` `noise_floor`) | KABUL yok; daha basit/hızlı model korunur |
 
 "BELİRSİZ" yok. Koşu hatası bir fikre RED yazdırmaz; "koşmadı" olarak kaydedilir.
 **Kötü skor hata değildir** — hata, kodun koşmaması veya çıktı üretmemesidir.
@@ -158,4 +174,5 @@ Güncel durum her zaman [`STATUS.md`](STATUS.md)'de; en üst satırı "insandan 
 eylem"dir.
 
 Nereye bakılacağı: kurallar [`CLAUDE.md`](CLAUDE.md), Codex protokolü
-[`CODEX.md`](CODEX.md), sistemin gerekçesi [`plan/`](plan/).
+[`CODEX.md`](CODEX.md) ve koordinatör modu [`AGENTS.md`](AGENTS.md), takım şartları
+[`SOZLESME.md`](SOZLESME.md), sistemin gerekçesi [`plan/`](plan/).
