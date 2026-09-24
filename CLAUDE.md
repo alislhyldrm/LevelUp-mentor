@@ -9,8 +9,9 @@ Kaggle'dan yalnız yarışma verisi indirilir. Kaggle'a giden tek şey, insanın
 editörüne kendi elleriyle yapıştırdığı koddur. `tools/kx.py` Kaggle CLI'yi hiç çağırmaz.
 
 ## Baseline'dan hemen sonra: liste zorunlu
-İlk baseline (`EXP-001` veya case'in ilk deneyi) skorunu aldıktan sonra, **başka hiçbir
-deney açmadan önce** `log/BACKLOG.md` doldurulur ve insana gösterilir:
+İlk baseline (`EXP-001` veya case'in ilk deneyi) ve gürültü koşusu (`EXP-002`, bkz. Akış)
+skorunu aldıktan sonra, **başka hiçbir deney açmadan önce** `log/BACKLOG.md` doldurulur ve
+insana gösterilir:
 1. `CODEX.md` Çağrı 4'ü (fikir üretimi) çağır — girdi: `case/CASE.md` + `case/TRAPS.md`
    bulguları + baseline sonucu. Bağımsız bir fikir listesi iste.
 2. Kendi bulgularını (TRAPS taraması, OOF hata analizi) da aynı listeye ekle.
@@ -47,7 +48,8 @@ değişiklik olur — planın en başta reddettiği şey tam olarak budur (bkz. 
 5. Hiçbir OOF/test tahmini silinmez. RED çıkanlar da ensemble havuzunda kalır.
    Her koşuda yalnız ekran çıktısı kaydedilir; OOF dosyaları **ensemble aşamasında**
    insan tarafından indirilir (`experiments/EXP-xxx/output/`). O ana kadar OOF sadece
-   Kaggle koşusunun çıktısında durur — `blend.py` dosyalar inmeden çalışmaz.
+   Kaggle koşusunun çıktısında durur — `blend.py` dosyalar inmeden çalışmaz. Yerel
+   koşuda dosyalar zaten `output/` altındadır.
 6. CV'de beklenmedik büyük sıçramada önce sızıntı araştırılır.
 7. **Gönderme.** Gönderim kararı insanındır ve saat hedefine bağlı değildir. Sen yalnız
    hazır aday önerirsin: EXP no · ana skor · dosya yolu · format kontrolü sonucu.
@@ -68,7 +70,7 @@ değişiklik olur — planın en başta reddettiği şey tam olarak budur (bkz. 
 | Tüm fold'larda iyileşme **veya** ortalama fark fold sapmasından belirgin büyük | **KABUL** — yeni ana hat |
 | Ortalama pozitif, tutarsız | **HAVUZ** — ana hat değişmez, OOF ensemble adayı. Farklı seed ile tekrar koşulmaz |
 | Ortalama negatif | **RED** — OOF yine saklanır |
-| Fark küçük | Daha **basit/hızlı** model korunur |
+| Fark küçük veya gürültü tabanı içinde (`kx.json` `noise_floor`) | KABUL yok; daha **basit/hızlı** model korunur |
 
 "BELİRSİZ" yok. Koşu hatası veya eksik çıktı bir fikre RED yazdırmaz; "koşmadı" olarak kaydedilir.
 
@@ -78,6 +80,7 @@ değişiklik olur — planın en başta reddettiği şey tam olarak budur (bkz. 
 | Şu an ne var, sırada ne var | `STATUS.md` |
 | Kural, metrik, format, ürün notu | `case/CASE.md` |
 | Veri tipine göre tuzaklar | `case/TRAPS.md` |
+| Teknik nasıl uygulanır (sızıntı, CV, HPO, pseudo-label, ensemble…); takım kodu şartları | `SOZLESME.md` |
 | Fold mantığı, ana skor, FAST tanımı | `core/cv_spec.md` |
 | Fikrin kaynağı | `log/RESEARCH.md` |
 | Neden bu deney | `log/BACKLOG.md` |
@@ -91,19 +94,28 @@ değişiklik olur — planın en başta reddettiği şey tam olarak budur (bkz. 
 
 ## Akış
 `/case` → ✋Onay 1 (CV + metrik) → baseline (Codex ile birlikte yazılır) → **koşu: insan**
-→ skor → OOF hata analizi + `log/BACKLOG.md` → ✋Onay 2 → `/exp` döngüsü → ensemble
-→ `/final` kapısı → final seçimi ve gönderim (insan)
+→ skor → gürültü koşusu → OOF hata analizi + `log/BACKLOG.md` → ✋Onay 2 → `/exp` döngüsü
+→ ensemble → `/final` kapısı → final seçimi ve gönderim (insan)
+
+**Gürültü koşusu:** `EXP-002` = `EXP-001`'in aynı kodu, yalnız model `SEED` farklı
+("keşif: gürültü tabanı"). Kaydından sonra `python tools/kx.py gurultu EXP-002` tabanı
+`kx.json`'a yazar; `cmp` bu tabanın içinde kalan farka KABUL önermez.
 
 Akışta **zorunlu submission yoktur.** Gönderim kararı insanındır, saat hedefine bağlı
 değildir; sen yalnız gönderilmeye hazır aday önerirsin.
 
-**✋Onay 2 tek tanım:** baseline skoru + OOF hata analizi + dolu `log/BACKLOG.md` aynı
-pakette insana sunulur. Onay gelmeden iterasyon başlamaz.
+**✋Onay 2 tek tanım:** baseline skoru + gürültü tabanı + OOF hata analizi + dolu
+`log/BACKLOG.md` aynı pakette insana sunulur. Onay gelmeden iterasyon başlamaz.
 
-### Tek koşu, tek onay
-Bir koşunun sonucu kaydedilmeden sıradaki kod verilmez. Art arda birkaç koşu planlayıp
-insanı sonuçta bilgilendirmek bu kuralın ihlalidir. Her turda:
-kodu ver (+ parent farkı) → insan koşturur → çıktıyı ver → `kayit` → `cmp` → karar.
+### Her koşu kendi onayı, kendi kaydı (K-08)
+Her kod insana ayrı verilir, ayrı onaylanır ve sonucu ayrı kaydedilir. Her turda:
+kodu ver (+ parent farkı + uygulanan teknikler) → insan koşturur → çıktıyı ver →
+`kayit` → `cmp` → karar.
+- **Paralel koşu** insan isterse açılır: aynı anda en çok ölçülen eşzamanlı limit
+  (ölçülmediyse 2). Paralel koşular aynı **kayıtlı** parent'tan açılır ve birbirinin
+  sonucuna dayanmaz.
+- Bir sonuca dayanan kod, o sonuç kaydedildikten sonra verilir. Birkaç koşuyu onaysız
+  planlayıp insanı sonuçta bilgilendirmek bu kuralın ihlalidir.
 
 ## Oturum başı / oturum sonu
 Yarışma günü tek sohbette bitmez; birden çok oturum açılır. Bağlam **sadece

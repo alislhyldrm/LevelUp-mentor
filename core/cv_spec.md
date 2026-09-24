@@ -5,11 +5,11 @@
 
 ## Ana validation şeması
 - Fold sayısı:
-- Bölme mantığı (grup / zaman / stratified / IID):
+- Bölme mantığı (`FOLD_SCHEME`: stratified / kfold / stratified_reg / group / stratified_group / time):
 - Gruplama anahtarı:
 - Zaman sütunu ve gap:
 - Test-ayrım hipotezi (test seti nasıl oluşturulmuş):
-- Bu hipotezi destekleyen veri kanıtı:
+- Bu hipotezi destekleyen veri kanıtı (`tools/adv_val.py` AUC + kayan kolonlar dahil):
 
 ## Ana skor
 - `cv_mean` (fold ortalaması) mı, `cv_oof` (birleşik OOF üzerinden tek hesap) mı:
@@ -17,6 +17,10 @@
 - Gerekçe:
 
 İkisi de her koşuda `result.json`'a yazılır. Sıralama ve karar **hep ana skorla** yapılır.
+
+## Gürültü tabanı (K-09)
+- `EXP-001` vs `EXP-002` (yalnız model `SEED` farklı) fold farkları:
+- `noise_floor` (`kx.py gurultu` yazar, `kx.json`):
 
 ## Duyarlılık kontrolü (alternatif şema)
 - Alternatif şema:

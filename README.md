@@ -51,16 +51,17 @@ göre kurulmaz.
 
 ```
 1  Claude  backlog'dan madde seç — hipotez, dayanak, süre yazılamıyorsa deney açılmaz
-2  Claude  code.py doldur (yalnız hazirla() ve model_kur() değişir)
+2  Claude  code.py doldur (TEKNIKLER, hazirla, fold_hazirla, model_kur, egit, tahmin)
 3  Codex   riskliyse kod incelemesi — GEÇERSİZ KILAR çıkarsa kod verilmez
-4  Claude  kodu + parent farkını insana ver
-5  İnsan   Kaggle notebook'una yapıştır → Run All → çıktıyı geri ver
+4  Claude  kodu + parent farkını + uygulanan teknikleri insana ver
+5  İnsan   inceler → Kaggle notebook'unda (veya yerelde) koşturur → çıktıyı geri ver
 6  Claude  kayit — fold parmak izi + submission formatı doğrulanır
 7  Claude  cmp — parent ile fold fold karşılaştırma
 8  İnsan   KABUL / HAVUZ / RED
 ```
 
-**Tek koşu, tek onay:** bir koşunun sonucu kaydedilmeden sıradaki kod verilmez.
+**Her koşu kendi onayı, kendi kaydı (K-08):** bir sonuca dayanan kod o sonuç kaydedildikten
+sonra verilir; paralel koşu yalnız insan isterse. Takım arkadaşlarının kodu için: `SOZLESME.md`.
 
 ---
 
@@ -88,10 +89,13 @@ Her klasörde ne zaman dolduğunu anlatan bir `README.md` var.
 python tools/kx.py new EXP-007 --parent EXP-003 --note "<hipotez>"   # deney aç
 python tools/kx.py kayit EXP-007                                     # çıktıyı doğrula ve kaydet
 python tools/kx.py cmp EXP-007                                       # parent ile karşılaştır
+python tools/kx.py gurultu EXP-002                                   # gürültü tabanı -> kx.json
 python tools/kx.py board                                             # durum panosu
 
-python tools/make_folds.py --target <hedef> [--pos <etiket>]         # D-01'den sonra bir kez
-python tools/test_kx.py                                              # 21 doğrulama senaryosu
+python tools/make_folds.py --target <hedef> [--pos <etiket>] [--group <kol>] [--time <kol>]
+python tools/adv_val.py                                              # train-vs-test kayması (yerel)
+python tools/blend.py EXP-011 EXP-012 [--rank]                       # OOF ensemble
+python tools/test_kx.py                                              # 45 doğrulama senaryosu
 ```
 
 `kx.py` Kaggle CLI'yi **hiç çağırmaz.** Bir PreToolUse hook'u yanlışlıkla çalışacak
@@ -137,17 +141,19 @@ iz değişir; bölmenin sessizce kayması böyle yakalanır.
 
 - **K-01** Kaggle'a hiçbir şey gönderilmez
 - **K-02** Koşuyu insan yapar
-- **K-03** Tek koşu, tek onay
+- **K-03** Tek koşu, tek onay → K-08 ile güncellendi
 - **K-04** Akışta zorunlu submission yok — gönderim kararı insanın
 - **K-05** Tek ortak Kaggle hesabı
 - **K-06** Fold garantisi parmak iziyle
 - **K-07** Gece kuyruğu ve nöbet düzeni yok
+- **K-08** Her koşu kendi onayı, kendi kaydı; paralel koşu insan isterse
+- **K-09** Gürültü tabanı: baseline'dan sonra yalnız seed'i farklı özdeş koşu
 
 ---
 
 ## Durum
 
-**Case bekleniyor.** Kurulum tamam, `python tools/test_kx.py` 21/21 geçiyor.
+**Case bekleniyor.** Kurulum tamam, `python tools/test_kx.py` 45/45 geçiyor.
 Güncel durum her zaman [`STATUS.md`](STATUS.md)'de; en üst satırı "insandan sıradaki
 eylem"dir.
 

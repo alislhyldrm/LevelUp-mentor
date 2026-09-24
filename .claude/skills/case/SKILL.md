@@ -18,12 +18,14 @@ Hedef, ilk 10 dakikada kod yazmaya değil, **neyi ölçtüğümüzü bilmeye** v
      Çelişkide ham metin hakemdir. Overview, Data, Evaluation, Rules ayrı dosyalardır.
    Tamam: her kaynağın ham metni diskte, yolu biliniyor.
 
-2. **Triyaj — `case/CASE.md` ilk tablosu.** 10 satırın hepsi cevaplanır veya
+2. **Triyaj — `case/CASE.md` ilk tablosu.** 11 satırın hepsi cevaplanır veya
    "bilinmiyor + nasıl öğrenilecek" yazılır. Tahmin etme.
    Özellikle: **code competition mı**, metrik ve yönü, submission formatı,
    günlük gönderim limiti, internet/süre kısıtı, kural kabulü yapıldı mı,
-   **veriyi/kodu Kaggle dışına taşımak serbest mi** (case Kaggle dışı bir kaynaktansa).
-   Tamam: 10 satır dolu; bilinmeyenler engel olarak işaretli.
+   **veriyi/kodu Kaggle dışına taşımak serbest mi** (case Kaggle dışı bir kaynaktansa),
+   **kod teslimi / jüri kod değerlendirmesi var mı ve koşu nerede yapılacak** (Kaggle
+   notebook mu, yerel mi — şablon ikisinde de değişmeden çalışır).
+   Tamam: 11 satır dolu; bilinmeyenler engel olarak işaretli.
 
 3. **Ürün bölümü (15 dk, Onay 1'i bekletmez).** `CASE.md` "Ürün bölümü" dört satırı:
    kullanıcı kim · tahmin hangi kararı destekliyor · gerçek kullanımda hangi girdiler
@@ -37,16 +39,20 @@ Hedef, ilk 10 dakikada kod yazmaya değil, **neyi ölçtüğümüzü bilmeye** v
 5. **Codex çağrısı #1 — metrik + validation denetimi.** `CODEX.md` Çağrı 1.
    **20 dakika sert sınır, EDA ile paralel.** Codex senin öneriyi görmeden kendi
    validation önerisini yazar. Sen kendi önerini ayrı hazırla.
+   Paralel: `python tools/adv_val.py` → adversarial AUC + en çok kayan kolonlar; çıktı
+   test-ayrım hipotezinin veri kanıtıdır.
    Çakışma çıkarsa hakem veri kanıtıdır — anlatım gücü değil.
    Tamam: iki öneri ve veri kanıtları elde; çatışma varsa `CODEX.md` kuralı uygulandı.
 
 6. **`core/` sözleşmesini kur — hepsi YEREL, Kaggle'a hiçbir şey yüklenmez.**
-   - `core/folds_snippet.py`: fold şeması, seed, fold sayısı D-01'e göre sabitlenir.
+   - `core/folds_snippet.py`: D-01'e göre yalnız sabitler seçilir (`FOLD_SCHEME`,
+     `N_FOLDS`, `FOLD_SEED`, `GAP`, `N_BINS`); fonksiyonlar olduğu gibi kalır.
    - `core/metric.py`: `score(y_true, y_pred)` + `GREATER_IS_BETTER`, resmi metrikle.
-   - `python tools/make_folds.py --target <hedef> [--pos <etiket>]` → `core/folds.csv`
-     + **fold parmak izi**. Parmak izi `core/cv_spec.md`'ye yazılır.
+   - `python tools/make_folds.py --target <hedef> [--pos <etiket>] [--group <kol>] [--time <kol>]`
+     → `core/folds.csv` + **fold parmak izi**. Parmak izi `core/cv_spec.md`'ye yazılır.
    - `core/cv_spec.md`: ana şema, ana skor, duyarlılık şeması, FAST tanımı, parmak izi.
-   - `kx.json`: `target`, `id_col`, `pos_label`, `main_score`, `greater_is_better` doldurulur.
+   - `kx.json`: `target`, `id_col`, `pos_label`, `main_score`, `greater_is_better`,
+     şemaya göre `group_col` / `time_col`, takım yüzlükleri `owners` doldurulur.
    Her koşu bu parmak izini basar; tutmayan sonuç kayda girmez.
    Tamam: `cv_spec.md` boş alan bırakmadan dolu; `folds.csv` ve parmak izi var.
 
@@ -60,8 +66,8 @@ Hedef, ilk 10 dakikada kod yazmaya değil, **neyi ölçtüğümüzü bilmeye** v
    Tamam: D-01 kayıtlı. Bundan sonra fold ve metrik **sabittir** (CLAUDE.md kural 1).
 
 ## Sonra
-Baseline (`EXP-001`) **Codex ile birlikte** yazılır, insan Kaggle'da koşturur, skor alınır.
-Sonra OOF hata analizi + `log/BACKLOG.md` (`CODEX.md` Çağrı 4 ile birlikte) → ✋Onay 2 →
+Baseline (`EXP-001`) **Codex ile birlikte** yazılır, insan koşturur, skor alınır. Ardından
+gürültü koşusu (`EXP-002`, yalnız `SEED` farklı → `kx.py gurultu`). Sonra OOF hata analizi + `log/BACKLOG.md` (`CODEX.md` Çağrı 4 ile birlikte) → ✋Onay 2 →
 `/exp` döngüsü.
 
 **13:30 hedefi, 15:00 sert sınırı: format kontrolünden geçmiş, gönderilmeye hazır ilk

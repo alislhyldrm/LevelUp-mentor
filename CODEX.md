@@ -110,13 +110,15 @@ Codex aynı case ve veri özetiyle **kendi baseline önerisini** bağımsız yaz
 karşılaştırılır, ayrıştıkları yerde hakem veri kanıtıdır.
 
 **Şart:** iskelet, fold bloğu, metrik bloğu ve çıktı bloğu değişmez — Codex yalnız
-`hazirla()` ve `model_kur()` içeriğini önerir. Baseline **hızlı ve sade** olmalı:
+`hazirla`, `fold_hazirla`, `model_kur`, `egit` içeriğini önerir; teknik kuralları
+`SOZLESME.md` §4. Baseline **hızlı ve sade** olmalı:
 amaç yüksek skor değil, güvenilir bir ölçüm zemini.
 
 ### İstenen çıktı formatı
 
-    - hazirla(): <hangi kolonlar, hangi dönüşüm, neden>
-    - model_kur(): <model ailesi + parametreler, neden bu>
+    - hazirla(): <hangi kolonlar, hangi satır-içi dönüşüm, neden>
+    - fold_hazirla(): <fold içinde fit edilen dönüşüm; yoksa "yok">
+    - model_kur() / egit(): <model ailesi + parametreler + early stopping yolu, neden bu>
     - Tahmini süre: <dk>
     - Riskler: <bu baseline neyi ölçemez>
 

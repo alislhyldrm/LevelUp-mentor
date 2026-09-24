@@ -17,7 +17,9 @@ Ana hat oturduktan sonra her deney **tek hipotez** taşır. Teknik olarak zorunl
 değişiklikler aynı deneyde kalır. Ana hat oturmadan önceki keşif deneyleri birden fazla
 değişiklik içerebilir; `card.md`'de "keşif" işaretlenir ve karar kuralına girmez.
 
-**Tek koşu, tek onay:** önceki koşunun sonucu kaydedilmeden sıradaki kod verilmez.
+**Her koşu kendi onayı, kendi kaydı (K-08):** bir sonuca dayanan kod o sonuç kaydedildikten
+sonra verilir. Paralel koşu yalnız insan isterse, aynı kayıtlı parent'tan ve eşzamanlı
+limit içinde açılır (`CLAUDE.md`).
 
 ## Akış
 
@@ -25,12 +27,14 @@ değişiklik içerebilir; `card.md`'de "keşif" işaretlenir ve karar kuralına 
    Numara aralığı: Claude `EXP-0xx`/`EXP-1xx`, Codex `EXP-2xx` (`CODEX.md`).
    Tamam: klasör, `code.py`, `card.md`, `diff.md`, `output/` var.
 
-2. **Kodu doldur.** `code.py` içindeki TODO'lar — **yalnız** `hazirla()` ve `model_kur()`.
+2. **Kodu doldur.** `code.py` içindeki TODO'lar — **yalnız** `TEKNIKLER`, `hazirla`,
+   `fold_hazirla`, `model_kur`, `egit`, `tahmin`. Kod yazmadan önce uygulanacak tekniğin
+   kuralını `SOZLESME.md` §4'ten oku.
    Kurallar:
    - Fold bloğu ve metrik bloğu `core/folds_snippet.py` + `core/metric.py`'den aynen
      gömülüdür. **Bu bloklara dokunma.** Kod kendi fold'unu üretmez.
-   - Fit edilen her dönüşüm fold **içinde** fit edilir.
-   - Her fold bitince skor basılır.
+   - Fit edilen veya hedefe bakan her dönüşüm `fold_hazirla`'da; `hazirla` satır-içidir.
+   - `TEKNIKLER` listesi her uygulanan tekniği tek satırla taşır (saf baseline'da boş).
    - Mod (FAST/FULL) ve seed açıkça yazılır. FAST tanımı `core/cv_spec.md`'de sabittir.
    - Çıktı bloğu ve `=== KX RESULT JSON ===` bloğu silinmez — kayıt bunlarla yapılır.
    Tamam: TODO kalmadı, `python -c "import ast; ast.parse(open(...).read())"` temiz.
@@ -42,17 +46,20 @@ değişiklik içerebilir; `card.md`'de "keşif" işaretlenir ve karar kuralına 
    Tamam: kademe ve varsa en küçük düzeltme kayıtlı.
 
 4. **Kodu insana ver.** `diff.md`'yi doldur (parent'a göre değişen satırlar) ve sohbette
-   göster: ne değişti · neden · tahmini süre · GPU gerekiyor mu.
+   göster: ne değişti · neden · **uygulanan teknikler** (her biri: ne · neden · sızıntı
+   nasıl önlendi) · tahmini süre · GPU gerekiyor mu.
    **Skor tek başına rapor değildir; insan neyin denendiğini kodda görmeden onay vermiş
    sayılmaz.** Uzun zincirlerde her adımı ayrı ayrı özetle, sona biriktirme.
    Tamam: `code.py` sohbete yapıştırıldı, `diff.md` dolu.
 
-5. **İnsan koşturur.** Kaggle notebook editörü → kodu yapıştır → `Run All`.
-   Burada beklersin; kendi başına sıradaki deneye geçmezsin.
+5. **İnsan koşturur.** Kaggle notebook editörü → kodu yapıştır → `Run All`; ya da yerelde
+   `python experiments/EXP-0xx/code.py` (koşu yeri `/case` triyajında belli olur).
+   Burada beklersin; sıradaki deney yalnız insan paralel koşu isterse açılır.
    Tamam: insan "koştu" dedi ve ekran çıktısını verdi.
 
-6. **Çıktıyı kaydet.** Ekran çıktısını `experiments/EXP-0xx/output/run_log.txt`'ye yaz,
-   sonra `python tools/kx.py kayit EXP-0xx`.
+6. **Çıktıyı kaydet.** Kaggle koşusunda ekran çıktısını
+   `experiments/EXP-0xx/output/run_log.txt`'ye yaz (yerel koşuda dosyalar zaten
+   `output/`'ta), sonra `python tools/kx.py kayit EXP-0xx`.
    - `run_log.txt` içindeki `=== KX RESULT JSON ===` bloğundan `result.json` üretilir.
    - **Fold parmak izi** yereldeki `core/folds.csv` ile karşılaştırılır. Tutmazsa sonuç
      kayda **girmez** — koşu başka fold'larla eğitilmiş demektir.
@@ -70,8 +77,8 @@ değişiklik içerebilir; `card.md`'de "keşif" işaretlenir ve karar kuralına 
    CV'de beklenmedik büyük sıçrama varsa önce sızıntı araştır.
    Tamam: öneri insana sunuldu, kararı insan verdi.
 
-8. **Kaydet.** `card.md`'yi doldur (Sonuç, Karar, Atlanan doğrulama, Ders, Codex incelemesi,
-   Ürün etkisi) ve `EXP_SUMMARY.md`'deki **Karar sütununu aynı anda** güncelle.
+8. **Kaydet.** `card.md`'yi doldur (Uygulanan teknikler, Sonuç, Karar, Atlanan doğrulama,
+   Ders, Codex incelemesi, Ürün etkisi) ve `EXP_SUMMARY.md`'deki **Karar sütununu aynı anda** güncelle.
    `STATUS.md`'yi tam yeniden yazma; yalnız `Şu an`, `Bu oturumda ne oldu` ve
    `İnsandan sıradaki eylem` bölümlerini güncelle. KABUL ise `Şu an`'daki ana hat
    satırı da değişir. RED/HAVUZ çıkan deney aynı anda `Denendi, işe yaramadı`'ya
@@ -90,6 +97,10 @@ değişiklik içerebilir; `card.md`'de "keşif" işaretlenir ve karar kuralına 
   varsa, gerçek kullanımda nasıl üretileceği oraya tek satır yazılır.
 
 ## İlk baseline'dan hemen sonra
+**Önce gürültü koşusu:** `EXP-002` = `EXP-001` kodu, yalnız `SEED` farklı, `card.md`'de
+"keşif: gürültü tabanı". Kaydından sonra `python tools/kx.py gurultu EXP-002`; taban
+`kx.json`'a yazılır ve sonraki her `cmp` onu kullanır.
+
 **Hata analizi beş deney beklemez.** Kısa bir OOF hata analizi yap; amaç fikir listesi
 üretmek değil, bir sonraki deneyi değiştirecek **tek bulgu** aramaktır. Bulguyu
 `log/BACKLOG.md`'ye dayanak olarak yaz. Bu analiz OOF dosyasını gerektirir — insandan

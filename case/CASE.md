@@ -18,6 +18,7 @@
 | 8 | Eşzamanlı koşu limiti (ölçüldü mü)? | | |
 | 9 | Bitiş saati ve final seçim hakkı? | | |
 | 10 | Dış veri / hazır model izni; veriyi Kaggle dışına taşımak serbest mi? | | |
+| 11 | Kod teslimi / jüri kod değerlendirmesi var mı; koşu Kaggle'da mı yerelde mi? | | |
 
 ## Görev
 - Girdi → tahmin birimi → çıktı:

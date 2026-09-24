@@ -2,6 +2,7 @@
 """blend — OOF uzerinde ensemble olcumu.
 
     python tools/blend.py EXP-011 EXP-012 EXP-015
+    python tools/blend.py EXP-011 EXP-012 --rank    # AUC/AP: olasilik yerine sira ortalamasi
 
 Once ESIT AGIRLIKLI karisimi olcer, sonra sinirli (<=200 adim) agirlik aramasi yapar.
 
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import json
 import sys
 from pathlib import Path
 
@@ -47,12 +49,20 @@ def load_oof(exp_id: str, id_col: str) -> pd.Series:
     if not p.exists():
         die(f"{exp_id}: oof.parquet yok. Ensemble icin OOF dosyalari gerekli - insan Kaggle Output'tan indirip experiments/{exp_id}/output/ altina koymali.")
     df = pd.read_parquet(p)
-    if "id" not in df.columns:
-        die(f"{exp_id}: oof.parquet'te 'id' kolonu yok.")
-    pred_cols = [c for c in df.columns if c not in ("id", "fold")]
+    idc = "id" if "id" in df.columns else id_col
+    if idc not in df.columns:
+        die(f"{exp_id}: oof.parquet'te kimlik kolonu ('id' / '{id_col}') yok.")
+    pred_cols = [c for c in df.columns if c not in (idc, "fold", "y")]
     if len(pred_cols) != 1:
         die(f"{exp_id}: {len(pred_cols)} tahmin kolonu var; bu arac tek kolonlu OOF bekler.")
-    return df.set_index("id")[pred_cols[0]]
+    return df.set_index(idc)[pred_cols[0]]
+
+
+def id_col_from_config() -> str:
+    p = ROOT / "kx.json"
+    if not p.exists():
+        return "id"
+    return json.loads(p.read_text(encoding="utf-8")).get("id_col") or "id"
 
 
 def fold_scores(score, y: pd.Series, p: pd.Series, folds: pd.Series) -> list[float]:
@@ -63,6 +73,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="OOF ensemble olcumu. Submit yapmaz.")
     ap.add_argument("exps", nargs="+", help="EXP-011 EXP-012 ...")
     ap.add_argument("--steps", type=int, default=200, help="agirlik arama adimi (varsayilan 200)")
+    ap.add_argument("--rank", action="store_true",
+                    help="OOF'lari once sira degerine cevir (AUC/AP gibi yalniz siralamaya bakan metrikler)")
     args = ap.parse_args()
 
     try:
@@ -71,7 +83,9 @@ def main() -> None:
         die(f"core/metric.py yuklenemedi: {exc}")
 
     truth = load_truth().set_index("id")
-    preds = pd.DataFrame({e: load_oof(e, "id") for e in args.exps})
+    truth = truth[truth["fold"] >= 0]   # time semasinin -1 blogu hic tahmin edilmez
+    id_col = id_col_from_config()
+    preds = pd.DataFrame({e: load_oof(e, id_col) for e in args.exps})
     common = preds.dropna().index.intersection(truth.index)
     if len(common) == 0:
         die("OOF'lar ile folds.csv arasinda ortak id yok. Hizalama bozuk.")
@@ -79,6 +93,11 @@ def main() -> None:
         print(f"UYARI: {len(truth) - len(common)} satir disarida kaldi (FAST kosu karisiyor olabilir).")
 
     P = preds.loc[common]
+    if args.rank:
+        # Olasilik olcekleri farkli modellerde siralamayi bozmadan esitlenir.
+        P = P.rank(pct=True)
+        print("RANK modu: her OOF [0,1] sira degerine cevrildi. Test tarafinda da her modelin")
+        print("test tahmini AYNI sekilde rank(pct=True) edilip ayni agirlikla karistirilmali.")
     y = truth.loc[common, "y"]
     f = truth.loc[common, "fold"]
     sign = 1.0 if GREATER_IS_BETTER else -1.0

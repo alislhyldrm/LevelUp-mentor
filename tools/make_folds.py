@@ -4,6 +4,11 @@
 D-01 (CV + metrik onayi) alindiktan SONRA bir kez calistirilir:
 
     python tools/make_folds.py --target <hedef_kolon> [--pos <pozitif_etiket>]
+                               [--group <grup_kolonu>] [--time <zaman_kolonu>]
+
+Sema core/folds_snippet.py'deki FOLD_SCHEME'dir. group/stratified_group --group,
+time --time ister; ayni kolon kx.json'a (group_col / time_col) yazilir ki Kaggle
+kosusu ayni diziyi kullansin.
 
 Cikti: core/folds.csv  (id, fold, y)  + ekrana fold parmak izi.
 Parmak izi core/cv_spec.md'ye yazilir; her Kaggle kosusu ayni izi basmalidir.
@@ -27,6 +32,8 @@ def main() -> None:
     p.add_argument("--target", required=True, help="hedef kolon adi")
     p.add_argument("--id", default="id", help="kimlik kolonu (varsayilan: id)")
     p.add_argument("--pos", help="pozitif sinif etiketi (ornek: Yes). Sayisal hedefte bos birak")
+    p.add_argument("--group", help="grup kolonu (group / stratified_group semasi)")
+    p.add_argument("--time", help="zaman kolonu (time semasi)")
     p.add_argument("--force", action="store_true", help="mevcut folds.csv'nin uzerine yaz")
     args = p.parse_args()
 
@@ -42,8 +49,9 @@ def main() -> None:
     train = pd.read_csv(args.train)
     if args.target not in train.columns:
         sys.exit(f"HATA: '{args.target}' kolonu {args.train} icinde yok.")
-    if args.id not in train.columns:
-        sys.exit(f"HATA: '{args.id}' kolonu {args.train} icinde yok.")
+    for kol in (args.id, args.group, args.time):
+        if kol and kol not in train.columns:
+            sys.exit(f"HATA: '{kol}' kolonu {args.train} icinde yok.")
 
     raw = train[args.target]
     if args.pos is not None:
@@ -54,7 +62,11 @@ def main() -> None:
         y = raw
 
     X = train.drop(columns=[c for c in (args.target, args.id) if c in train.columns])
-    fold = make_folds(X, y.values)
+    fold = make_folds(
+        X, y.values,
+        groups=train[args.group].values if args.group else None,
+        times=train[args.time].values if args.time else None,
+    )
     fp = fold_fingerprint(fold)
 
     out = pd.DataFrame({args.id: train[args.id], "fold": fold, "y": y.values})
@@ -62,7 +74,8 @@ def main() -> None:
     out.to_csv(FOLDS_PATH, index=False)
 
     print(f"{FOLDS_PATH} yazildi: {len(out)} satir, {N_FOLDS} fold, sema={FOLD_SCHEME}, seed={FOLD_SEED}")
-    print(f"fold dagilimi: {out['fold'].value_counts().sort_index().tolist()}")
+    print(f"fold dagilimi: {out['fold'].value_counts().sort_index().to_dict()}"
+          + ("  (-1 = hep egitimde, time semasi)" if (out["fold"] < 0).any() else ""))
     print(f"hedef orani  : {float(y.mean()):.5f}")
     print(f"\nFOLD PARMAK IZI: {fp}")
     print("Bunu core/cv_spec.md'ye yaz. Her Kaggle kosusu ayni izi basmali.")

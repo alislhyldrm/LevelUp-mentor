@@ -8,6 +8,7 @@ Komutlar:
     kx.py new   EXP-017 --parent EXP-012 --note "charging_total" [--target ... --id-col ...]
     kx.py kayit EXP-017            # output/ icindekini dogrula + EXP_SUMMARY'ye yaz
     kx.py cmp   EXP-017            # parent ile fold fold karsilastir
+    kx.py gurultu EXP-002          # ozdes kosu (yalniz model seed farkli) -> kx.json noise_floor
     kx.py board                    # tek ekran
 
 Bu betik Kaggle CLI'yi HIC cagirmaz: ne kernel push, ne dataset yukleme, ne gonderim.
@@ -41,6 +42,10 @@ CONFIG_TEMPLATE = {
     "sample_submission": "data/sample_submission.csv",
     "main_score": "cv_mean",
     "greater_is_better": True,
+    "group_col": "",
+    "time_col": "",
+    "owners": {},
+    "noise_floor": None,
 }
 
 
@@ -80,15 +85,23 @@ def exp_number(exp_id: str) -> int:
     return int(exp_id.split("-")[1])
 
 
-def owner_of(exp_id: str) -> str:
-    """CODEX.md kimlik ayrimi: EXP-2xx Codex'in, gerisi Claude'un."""
-    return "codex" if 200 <= exp_number(exp_id) < 300 else "claude"
+def owner_of(exp_id: str, cfg: dict | None = None) -> str:
+    """Kimlik ayrimi (CODEX.md, SOZLESME.md): kx.json 'owners' yuzlugu takim
+    arkadasina atar (ornek {"3": "ay"} -> EXP-3xx). Atanmamissa EXP-2xx Codex,
+    gerisi Claude."""
+    yuzluk = str(exp_number(exp_id) // 100)
+    owners = (cfg or {}).get("owners") or {}
+    if yuzluk in owners:
+        return owners[yuzluk]
+    return "codex" if yuzluk == "2" else "claude"
 
 
 def slug_for(exp_id: str, cfg: dict) -> str:
     """Kaggle notebook adi. Tek ortak hesapta 6 kisi calisiyor - cakisma olmasin."""
-    tag = "cx" if owner_of(exp_id) == "codex" else "cl"
-    return f"{cfg['initials']}-{tag}-exp-{exp_number(exp_id):03d}"
+    owner, no = owner_of(exp_id, cfg), exp_number(exp_id)
+    if owner in ("claude", "codex"):
+        return f"{cfg['initials']}-{'cx' if owner == 'codex' else 'cl'}-exp-{no:03d}"
+    return f"{owner}-exp-{no:03d}"
 
 
 def read_result(exp_id: str) -> dict | None:
@@ -150,7 +163,7 @@ def cmd_new(args, cfg) -> None:
     d.mkdir(parents=True)
     (d / "output").mkdir()
 
-    owner = owner_of(exp_id)
+    owner = owner_of(exp_id, cfg)
     slug = slug_for(exp_id, cfg)
     note = (args.note or "TODO").replace('"', "'")
 
@@ -166,6 +179,8 @@ def cmd_new(args, cfg) -> None:
         ("__TARGET__", args.target or cfg.get("target", "")),
         ("__IDCOL__", args.id_col or cfg.get("id_col", "id")),
         ("__POS_LABEL__", args.pos_label if args.pos_label is not None else cfg.get("pos_label", "")),
+        ("__GROUP_COL__", cfg.get("group_col") or ""),
+        ("__TIME_COL__", cfg.get("time_col") or ""),
     ):
         code = code.replace(token, value)
     (d / "code.py").write_text(code, encoding="utf-8")
@@ -177,6 +192,7 @@ def cmd_new(args, cfg) -> None:
         f"- Hipotez: {note}\n"
         f"- Dayanak: TODO (bu veride olculen gozlem)\n"
         f"- Degisiklik: TODO (parent'a gore tam olarak ne - diff.md'de satir satir)\n"
+        f"- Uygulanan teknikler: TODO (code.py TEKNIKLER ile ayni; saf baseline ise 'yok')\n"
         f"- Mod/Seed/GPU: FULL / 42 / hayir\n"
         f"- Tahmini sure: TODO-TODO dk\n"
         f"- Sonuc: -\n"
@@ -197,7 +213,7 @@ def cmd_new(args, cfg) -> None:
 
     print(f"{exp_id} olusturuldu  ->  {d}")
     print(f"  owner={owner}  parent={parent}  Kaggle notebook adi: {slug}")
-    print("  1. code.py'deki TODO'lari doldur (hazirla / model_kur)")
+    print("  1. code.py'deki TODO'lari doldur (TEKNIKLER / hazirla / fold_hazirla / model_kur / egit)")
     print("  2. diff.md'yi doldur ve INSANA GOSTER - onaysiz kosu yok")
     print("  3. insan Kaggle'da kosturur, ekran ciktisini output/run_log.txt'ye koy")
     print(f"  4. `kx.py kayit {exp_id}`")
@@ -284,9 +300,12 @@ def validate_output(exp_id: str, out: Path, cfg: dict) -> tuple[list[str], list[
     if FOLDS_PATH.exists():
         try:
             folds = _read_table(FOLDS_PATH)
-            expected_rows = len(folds)
+            # time semasinda -1 blogu hic tahmin edilmez; OOF yalniz fold >= 0 satirlari tasir.
             if "fold" in folds.columns:
-                expected_folds = int(folds["fold"].nunique())
+                tahminli = folds[folds["fold"] >= 0]
+                expected_rows, expected_folds = len(tahminli), int(tahminli["fold"].nunique())
+            else:
+                expected_rows = len(folds)
         except Exception as exc:  # noqa: BLE001
             errs.append(f"core/folds.csv okunamadi: {exc}")
     else:
@@ -397,19 +416,20 @@ def cmd_kayit(args, cfg) -> None:
     folds = result.get("fold_scores") or []
     append_line(
         SUMMARY_PATH,
-        f"| {exp_id} | {result.get('owner', owner_of(exp_id))} | {result.get('parent', '-')} "
+        f"| {exp_id} | {result.get('owner', owner_of(exp_id, cfg))} | {result.get('parent', '-')} "
         f"| {result.get('mode', '-')} | {score} | {result.get('cv_mean')} | {result.get('cv_oof')} "
         f"| {len(folds)} | {result.get('runtime_min', '-')} | - "
         f"| {result.get('fold_fingerprint', '?')} |",
     )
     append_line(
         RUNS_PATH,
-        f"| {slug_for(exp_id, cfg)} | {result.get('owner', owner_of(exp_id))} | {now()} "
+        f"| {slug_for(exp_id, cfg)} | {result.get('owner', owner_of(exp_id, cfg))} | {now()} "
         f"| {result.get('mode', '-')} | {result.get('runtime_min', '?')} | bitti |",
     )
 
     print(f"\nDOGRULAMA GECTI. {exp_id} ana skor ({main_key}): {score}")
     print(f"fold skorlari: {folds}")
+    print(f"uygulanan teknikler: {result.get('teknikler') or 'yok / kayitta yok'}  (card.md'ye yaz)")
     if atlanan:
         print("\nATLANAN DOGRULAMALAR (card.md'ye yaz, sessizce gecme):")
         for a in atlanan:
@@ -490,18 +510,73 @@ def cmd_cmp(args, cfg) -> None:
         wins = sum(1 for dd in diffs if dd > 0)
         print(f"  iyilesen fold: {wins}/{len(diffs)}")
 
-        if wins == len(diffs) or (md > 0 and sd > 0 and md > 2 * sd):
+        nf = cfg.get("noise_floor")
+        olculdu = isinstance(nf, (int, float)) and not isinstance(nf, bool) and nf > 0
+        gurultu_ici = olculdu and abs(md) <= nf
+        if olculdu:
+            print(f"  gurultu tabani (kx.json noise_floor): {nf:.6f}"
+                  + ("  -> fark GURULTU ICINDE" if gurultu_ici else "  -> fark gurultunun disinda"))
+        else:
+            print("  UYARI: gurultu tabani olculmedi (kx.json noise_floor bos). "
+                  "Ozdes kosu (EXP-002) + `kx.py gurultu` yapilmadan KABUL'un kaniti eksik.")
+
+        kabul = wins == len(diffs) or (md > 0 and sd > 0 and md > 2 * sd)
+        if kabul and not gurultu_ici:
             suggestion = "KABUL - yeni ana hat"
         elif md > 0:
             suggestion = "HAVUZ - ana hat degismez, OOF ensemble adayi. Farkli seed ile tekrar kosma."
         else:
             suggestion = "RED - OOF yine saklanir, silinmez"
-        if abs(md) < sd / 4:
+        if gurultu_ici:
+            suggestion += "  (fark gurultu tabani icinde: daha basit/hizli model korunur)"
+        elif abs(md) < sd / 4:
             suggestion += "  (fark kucuk: daha basit/hizli model korunur)"
 
     print(f"\n  ONERI: {suggestion}")
     print("  Karari insan verir. card.md'ye yaz, EXP_SUMMARY.md'deki Karar sutununu doldur,")
     print("  STATUS.md'yi guncelle.")
+
+
+# ------------------------------------------------------------------ gurultu
+
+def cmd_gurultu(args, cfg) -> None:
+    """Ozdes iki kosu (yalniz model SEED'i farkli) arasindaki farktan gurultu tabani.
+
+    Iki farkli deneyin ortalama fold farki, yalniz seed gurultusuyle yaklasik
+    std(d)/sqrt(n) oynar (d = ozdes kosularin fold farklari). Taban = 2 * bu deger.
+    `kx.py cmp` ortalama farki bu tabanin icinde kalan deneye KABUL onermez.
+    """
+    exp_id = normalize_exp(args.exp)
+    child = read_result(exp_id)
+    if child is None:
+        die(f"{exp_id} icin result.json yok. Once `kx.py kayit {exp_id}`.")
+    parent_raw = args.parent or child.get("parent")
+    if not parent_raw or parent_raw == "-":
+        die(f"{exp_id} icin parent yok. --parent EXP-001 ver.")
+    parent_id = normalize_exp(parent_raw)
+    parent = read_result(parent_id)
+    if parent is None:
+        die(f"{parent_id} icin result.json yok.")
+    if child.get("fold_fingerprint") != parent.get("fold_fingerprint") or child.get("mode") != parent.get("mode"):
+        die("Iki kosu ayni fold'da / ayni modda degil - gurultu olcumu olmaz.")
+    if child.get("seed") == parent.get("seed"):
+        die(f"Iki kosunun seed'i ayni ({child.get('seed')}). Gurultu kosusunda yalniz model SEED'i degisir.")
+    cf, pf = child.get("fold_scores") or [], parent.get("fold_scores") or []
+    if len(cf) != len(pf) or len(cf) < 2:
+        die("Fold skorlari eksik veya uyusmuyor.")
+
+    d = [c - p for c, p in zip(cf, pf)]
+    taban = 2 * _std(d) / len(d) ** 0.5
+    key = cfg.get("main_score", "cv_mean")
+    print(f"\n{exp_id} vs {parent_id}  (ozdes kod, seed {parent.get('seed')} -> {child.get('seed')})")
+    print(f"  fold farklari: {[round(x, 6) for x in d]}")
+    print(f"  ana skor ({key}) farki: {child.get(key, 0) - parent.get(key, 0):+.6f}")
+    print(f"  gurultu tabani = 2 * std(d) / sqrt(n) = {taban:.6f}")
+    if taban == 0:
+        die("Taban 0 cikti - iki kosu birebir ayni. Model seed'i gercekten kullaniliyor mu?")
+    cfg["noise_floor"] = round(taban, 8)
+    CONFIG_PATH.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"  kx.json noise_floor = {cfg['noise_floor']} yazildi. card.md'ye ve log/DECISIONS.md'ye not dus.")
 
 
 # -------------------------------------------------------------------- board
@@ -563,6 +638,11 @@ def main() -> None:
     c.add_argument("exp")
     c.add_argument("--parent")
     c.set_defaults(fn=cmd_cmp)
+
+    g = sub.add_parser("gurultu", help="ozdes kosudan gurultu tabani -> kx.json noise_floor")
+    g.add_argument("exp")
+    g.add_argument("--parent")
+    g.set_defaults(fn=cmd_gurultu)
 
     b = sub.add_parser("board", help="tek ekran")
     b.set_defaults(fn=cmd_board)
