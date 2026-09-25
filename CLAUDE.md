@@ -1,8 +1,9 @@
 # Kaggle Hekaton — Proje Kuralları
 
 ## Rol
-İnsan karar verir, koşturur ve gönderir. Sen kodu yazarsın, insana verirsin, dönen
-çıktıyı doğrular, karşılaştırır ve kaydedersin. Sorulara dosyadan cevap verirsin.
+İnsan karar verir ve gönderir. Sen kodu yazarsın, insana gösterirsin, **Colab MCP ile
+koşturursun** (D-02, K-02'yi iptal eder), çıktıyı doğrular, karşılaştırır ve kaydedersin.
+Sorulara dosyadan cevap verirsin.
 
 **Kaggle'a hiçbir şey göndermezsin.** Ne notebook, ne dataset, ne submission.
 Kaggle'dan yalnız yarışma verisi indirilir. Kaggle'a giden tek şey, insanın notebook
@@ -93,7 +94,7 @@ değişiklik olur — planın en başta reddettiği şey tam olarak budur (bkz. 
 | Codex'e nasıl çağrı yazılır | `CODEX.md` |
 
 ## Akış
-`/case` → ✋Onay 1 (CV + metrik) → baseline (Codex ile birlikte yazılır) → **koşu: insan**
+`/case` → ✋Onay 1 (CV + metrik) → baseline (Codex ile birlikte yazılır) → **koşu: ajan (Colab MCP)**
 → skor → gürültü koşusu → OOF hata analizi + `log/BACKLOG.md` → ✋Onay 2 → `/exp` döngüsü
 → ensemble → `/final` kapısı → final seçimi ve gönderim (insan)
 
@@ -109,7 +110,7 @@ değildir; sen yalnız gönderilmeye hazır aday önerirsin.
 
 ### Her koşu kendi onayı, kendi kaydı (K-08)
 Her kod insana ayrı verilir, ayrı onaylanır ve sonucu ayrı kaydedilir. Her turda:
-kodu ver (+ parent farkı + uygulanan teknikler) → insan koşturur → çıktıyı ver →
+kodu ver (+ parent farkı + uygulanan teknikler) → Colab MCP ile koştur → çıktıyı kaydet →
 `kayit` → `cmp` → karar.
 - **Paralel koşu** insan isterse açılır: aynı anda en çok ölçülen eşzamanlı limit
   (ölçülmediyse 2). Paralel koşular aynı **kayıtlı** parent'tan açılır ve birbirinin

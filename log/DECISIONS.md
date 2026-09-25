@@ -24,4 +24,9 @@ ilk karardır (CV şeması + metrik + ana skor).
 
 | D | Saat | Karar | Gerekçe |
 |---|---|---|---|
-| | | | |
+| D-00 | 25 Eyl | **200 px²'den küçük araçlar kasıtlı olarak tespit edilmez** (hedeflenmez; eğitim/çıktıda ayrı ele alınması veriyi görünce netleşir) | BD s.3: bu araçlar etiketsiz ve puanı etkilemiyor |
+| D-01 | 25 Eyl | **CV: tek bölme, %80 train / %20 val**, platformun train+valid'i birleştirilip görüntü düzeyinde iterative stratification (4 sınıf varlık + kutu sayısı), seed 42 (`data/eda_split.py`). Val 1294/6469. Ana skor: val mAP@0.5 (COCO, 4 sınıf ortalaması). Sekans izi yok → gruplar tekil | İnsan: "val %20, her class eşit oranda"; "kodları koş" |
+| D-02 | 25 Eyl | **K-02'yi iptal eder: koşuyu ajan yapar**, Colab MCP üzerinden (Google AI Pro Colab). Kod yine insana gösterilir; K-01 (Kaggle'a gönderim yok) geçerli | İnsan: "MCP kur, kodları koş, CLAUDE.md'deki kuralı sil" |
+| D-03 | 25 Eyl | **Dış veri kümesi kesinlikle yasak.** Yalnız yarışmanın (Evren'de etiketlenen) verisi kullanılır. Objects365/COCO ön-eğitimli ağırlığın bu yasağa girip girmediği açık soru → insana sorulur, cevap gelmeden uzun koşu yok | İnsan: "ayrı bir veri kümesi kullanamayız, kesinlikle yasak" |
+| D-04 | 25 Eyl | **EXP-001 Codex adımı yeni oturumda** (CODEX.md Çağrı 1 + 1b); mevcut `experiments/EXP-001/code.py` taslaktır, Codex incelemesinden önce uzun koşu yok | İnsan: "Codex adımı yeni oturumda olmalı" |
+| D-05 | 25 Eyl | **Objects365 ön-eğitimli ağırlık YASAK** (D-03'ün açık sorusu kapandı). EXP-001 sıfırdan eğitime çevrildi: `HGNetv2.pretrained: False`, `-t` yok, base config `dfine_hgnetv2_s_custom.yml`. ImageNet backbone de dış ağırlık sayıldı. Model M→S, epoch planı ölçülen süreye göre 60 | İnsan: "Object 365 yasak" |
