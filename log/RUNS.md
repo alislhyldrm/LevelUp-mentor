@@ -7,7 +7,7 @@ Kodu insana vermeden önce `python tools/kx.py board` bak.
 | slug | kim | başlangıç | GPU | tahmini bitiş | durum |
 |---|---|---|---|---|---|
 | EXP-001_smoke | Claude/Colab | 25 Eyl | T4 | — | **bitti** — 2/2 epoch, 2:05. Boru hattı testi; skor karşılaştırmasına girmez |
-| EXP-001 (tam) | Claude/Colab | 25 Eyl | T4 | ≈11,3 sa (60 ep × 11,3 dk, ölçüldü) | **koşuyor** |
+| EXP-001 (tam) | Claude/Colab | 25 Eyl | T4 | **≈19,9 sa** (60 ep × 19,9 dk, tam koşudan ölçüldü) | **koşuyor** |
 
 ## Kurallar
 - GPU gerektirmeyen her şey **CPU'da koşar** (tablo/GBDT dahil). GPU kotası derin

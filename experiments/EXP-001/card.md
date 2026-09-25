@@ -15,7 +15,7 @@
 - **Hangi backlog maddesi:** — (ilk baseline)
 - **Hipotez:** 960 girişte sıfırdan eğitilmiş D-FINE-S, bu veride ölçülebilir bir mAP@0.5 zemini verir.
 - **Dayanak:** EDA — kutuların %38'i <32², 640'a küçültünce p5 kutu kenarı ≈ 7 px (`case/CASE.md` satır 6).
-- **Tahmini süre:** ÖLÇÜLDÜ → 11,3 dk/epoch × 60 epoch ≈ **11,3 saat**.
+- **Tahmini süre:** ÖLÇÜLDÜ (tam koşu) → 19,9 dk/epoch × 60 epoch ≈ **19,9 saat**.
 
 ## TEKNİKLER (ne · neden · sızıntı nasıl önlendi)
 - **D-FINE-S / HGNetv2-B0, sıfırdan (rastgele başlatma)** · neden: D-03 dış veri yasağı +
@@ -56,14 +56,23 @@ Kategori sırası `[(0,car),(1,van),(2,truck),(3,bus)]` doğrulandı. train∩va
 - KX RESULT bloğu bu koşuda üretilmedi — hücre 4 çalıştırılmadı (smoke'un amacı kurulum+eğitim yolu).
 
 ### Ölçülen hız (T4, batch 8, 960, sıfırdan)
-| | sn/adım | not |
+| kaynak | eğitim sn/adım | not |
 |---|---|---|
-| eğitim | **0,9123** | epoch 1 (epoch 0 = 2,14, ısınma dahil, sayılmadı) |
-| val | **0,5382** | veri bekleme %44 → 2 CPU çekirdeği dataloader'ı sınırlıyor |
+| SMOKE (256 görüntü) | 0,9123 | **YANILTICI** — 256 görüntü OS önbelleğine sığdığı için 2. epoch yapay hızlı |
+| TAM koşu (5175 görüntü) | **1,708** | gerçek değer; `data: 0,68` → adımın **%40'ı veri beklemesi** |
+| val | 0,5382 | smoke ölçümü |
 | GPU bellek | 6927 / 15360 MiB | batch 16'ya yer var, denenmedi |
 
-**Tam koşu:** 9,8 dk eğitim + 1,5 dk val = **11,3 dk/epoch**.
-40 ep ≈ 7,5 sa · **60 ep ≈ 11,3 sa** · 100 ep ≈ 18,8 sa · 220 ep (repo sıfırdan tarifi) ≈ 41,4 sa.
+**Tam koşu (ölçülen 1,708 sn/adım × 646 adım):** 18,4 dk eğitim + ~1,5 dk val = **19,9 dk/epoch**.
+30 ep ≈ 10,0 sa · 40 ep ≈ 13,3 sa · **60 ep ≈ 19,9 sa** · 220 ep (repo sıfırdan tarifi) ≈ 73 sa.
+
+> Smoke'tan yapılan ilk tahmin (11,3 sa) **yanlıştı**; küçük alt kümede dosya önbelleği
+> dataloader maliyetini gizledi. Alt küme hız ölçümü bu boyutta güvenilir değil.
+
+### Dataloader darboğazı (ölçüldü)
+Veri: 6469 JPEG, 1,5 GB toplam, ortalama 0,24 MB, kaynak çözünürlük 1360×765 … 2000×1500.
+Colab T4 runtime'ı **2 vCPU** veriyor, RAM 12 GB (7 GB önbellek boşta → disk I/O sorun değil,
+**JPEG çözme + 960'a yeniden boyutlandırma + augmentasyon** sorun). `num_workers=2` tavan.
 
 ## Bu koşudan öğrenilen kod hataları (taslakta vardı, düzeltildi)
 1. **`epoches` → `epochs`** (GEÇERSİZ KILAR, Codex Çağrı 1b buldu, repoda doğrulandı: `epoches`
@@ -83,6 +92,8 @@ Kategori sırası `[(0,car),(1,van),(2,truck),(3,bus)]` doğrulandı. train∩va
   En iyi AP50 epoch'uyla çakışmayabilir. Ölçülmedi.
 - **60 epoch, repo sıfırdan tarifinin (220) %27'si.** Model eksik eğitilmiş olacak. Süre bütçesi kararı.
   LR milestone 51. epoch'ta (%85) düşüyor — koşu sonradan uzatılırsa LR zaten düşmüş olur.
+- **Süre bütçesi ÇAKIŞIYOR.** 60 epoch = 19,9 sa. `EXP-002` (gürültü tabanı, K-09) aynı kodun
+  yalnız SEED'i değişmiş hâli → bir 19,9 sa daha. Toplam ≈40 sa, yarışma iki gün. İnsan kararı bekliyor.
 - **Colab oturumu kopabilir.** `checkpoint_freq: 1` ile her epoch `last.pth` Drive'a yazılıyor,
   hücre 2 `-r last.pth` ile devam eder.
 - **Yakın-kopya sızıntısı dışlanmadı** (Codex Çağrı 1). D-01 değişmiyor (kural 1: kanıtlanmış kusur yok),
