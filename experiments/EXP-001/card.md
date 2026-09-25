@@ -9,13 +9,13 @@
 | koşu yeri | Google Colab, **A100-SXM4-80GB (85,1 GB, 12 vCPU)** (Kaggle'a gönderim yok — K-01) |
 | kod | `experiments/EXP-001/code.py` |
 | repo | Peterande/D-FINE @ `956d1709314c2c6a4df6f34de232054578a7449f` (sabitlendi) |
-| durum | **SMOKE geçti · tam koşu başladı, sonuç bekleniyor** |
+| durum | **A100'de koşuyor** — epoch 1/60, 4,5 dk/epoch, tahmini bitiş 4,5 sa |
 
 ## Dört satır
 - **Hangi backlog maddesi:** — (ilk baseline)
 - **Hipotez:** 960 girişte sıfırdan eğitilmiş D-FINE-S, bu veride ölçülebilir bir mAP@0.5 zemini verir.
 - **Dayanak:** EDA — kutuların %38'i <32², 640'a küçültünce p5 kutu kenarı ≈ 7 px (`case/CASE.md` satır 6).
-- **Tahmini süre:** ÖLÇÜLDÜ (tam koşu) → 19,9 dk/epoch × 60 epoch ≈ **19,9 saat**.
+- **Süre:** ÖLÇÜLDÜ (A100, tam epoch) → 4,5 dk/epoch × 60 epoch = **4,5 saat**.
 
 ## TEKNİKLER (ne · neden · sızıntı nasıl önlendi)
 - **D-FINE-S / HGNetv2-B0, sıfırdan (rastgele başlatma)** · neden: D-03 dış veri yasağı +
@@ -60,6 +60,21 @@ Kategori sırası `[(0,car),(1,van),(2,truck),(3,bus)]` doğrulandı. train∩va
 - Model 10,18 M parametre, 52,46 GFLOPS (ileri, 960).
 - AP50 epoch 0 = 0,0000 · epoch 1 = 0,0010 (2 epoch rastgele başlangıçtan; beklenen).
 - KX RESULT bloğu bu koşuda üretilmedi — hücre 4 çalıştırılmadı (smoke'un amacı kurulum+eğitim yolu).
+
+### A100 ölçümü (gözlem, epoch 0 tam)
+| | T4, batch 8 | **A100-80GB, batch 32** |
+|---|---|---|
+| epoch süresi | 28,0 dk | **4,5 dk** (6,2× hızlı) |
+| 60 epoch | 28,0 sa | **4,5 sa** |
+| sn/adım | 1,708 | 1,067 (adım/epoch 646→161) |
+| veri beklemesi | **%40** (2 vCPU) | **%8** (12 vCPU) — darboğaz kalktı |
+| bellek zirvesi | 7,28 / 15,4 GB | 27,9 / 85,1 GB |
+| AP50 (epoch 0) | 0,0077 | 0,0047 |
+
+Epoch 0'da AP50 T4'ünkinden düşük: batch 32'de epoch başına 161 optimizer adımı var (T4'te 646)
+ve warmup 2 epoch sürüyor. Epoch 0 değerleri gürültü seviyesinde, karşılaştırmaya girmez.
+
+**Süre bütçesi çözüldü:** EXP-001 4,5 sa + EXP-002 (gürültü tabanı) 4,5 sa = 9 sa. İki güne sığar.
 
 ## T4 kısmi koşusu (iptal edildi, arşivlendi)
 Tam veriyle 1 epoch koştu: **AP50 = 0,0077** · AP50:95 = 0,0029 (repo içi, maxDets=100).
