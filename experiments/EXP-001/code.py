@@ -155,10 +155,23 @@ assert Path(base_cfg).exists(), f"config yok: {base_cfg}"
 
 E      = 2 if SMOKE else EPOCHS
 NO_AUG = 1 if SMOKE else max(4, E // 8)     # son NO_AUG epoch'ta güçlü augmentasyon kapanır
-BATCH  = 8 if GPU_GB > 14 else 4
-WORKERS = max(2, min(4, os.cpu_count()))
+# Batch: ölçülen bellekten türetildi. T4'te batch 8 = 7,28 GB zirve → sabit maliyet ~1,5 GB,
+# örnek başına ~0,72 GB. A100 40 GB'ta batch 32 ≈ 24,5 GB (15 GB pay), L4 22 GB'ta batch 16 ≈ 13 GB.
+# A100'de daha da büyük batch sığar ama epoch süresi batch'e değil görüntü sayısına bağlı;
+# batch küçük tutmak epoch'u yavaşlatmadan optimizer adım sayısını artırır. 5175 görüntülük
+# sıfırdan eğitimde adım sayısı değerli, o yüzden A100'de 64 değil 32.
+if   GPU_GB > 35: BATCH = 32      # A100 40/80 GB → ≈24,5 GB
+elif GPU_GB > 20: BATCH = 16      # L4 22 GB      → ≈13 GB
+elif GPU_GB > 14: BATCH = 8       # T4 15,6 GB (ölçüldü: 7,28 GB zirve)
+else:             BATCH = 4
+WORKERS = max(2, min(8, os.cpu_count()))   # T4 runtime 2 vCPU verir; L4/A100 daha fazlasını
 # LR: repo S tarifi batch 64'te lr 4e-4 / backbone 2e-4. sqrt ölçekleme ile batch BATCH'e indir.
 # ÖLÇÜLMEDİ — sıfırdan eğitimde doğru LR bu veride sınanmadı.
+ADIM_EP = 5175 // BATCH
+# warmup ITERASYON cinsinden (src/solver/det_engine.py:119, eğitim döngüsü içinde adımlanıyor)
+# ve lr_scheduler warmup bitene kadar hiç adımlamıyor (det_solver.py:94). Sabit 1000 yazılırsa
+# batch büyüdükçe warmup epoch cinsinden uzar: batch 48'de 1000 iter = 9,3 epoch. Adıma bağla.
+WARMUP  = 50 if SMOKE else max(100, 2 * ADIM_EP)
 ol      = (BATCH / 64) ** 0.5
 LR      = round(4e-4 * ol, 7)
 LR_BB   = round(2e-4 * ol, 7)
@@ -214,12 +227,12 @@ exp_cfg = {
         ],
     },
     "lr_scheduler": {"type": "MultiStepLR", "milestones": [max(1, int(E * 0.85))], "gamma": 0.1},
-    "lr_warmup_scheduler": {"type": "LinearWarmup", "warmup_duration": 50 if SMOKE else 1000},
+    "lr_warmup_scheduler": {"type": "LinearWarmup", "warmup_duration": WARMUP},
 }
 CFG = f"{REPO}/configs/dfine/custom/{EXP.lower()}.yml"
 yaml.safe_dump(exp_cfg, open(CFG, "w"), sort_keys=False, default_flow_style=False)
 print(f"config: {CFG}\n  epoch {E} (son {NO_AUG} epoch aug kapalı) | batch {BATCH} | workers {WORKERS}"
-      f" | lr {LR} (backbone {LR_BB})")
+      f" | lr {LR} (backbone {LR_BB}) | adım/epoch {ADIM_EP} | warmup {WARMUP} iter")
 
 # --- Çözülmüş config'ten kritik değerleri DOĞRULA (yanlış patch sessiz geçmesin) -------------
 sys.path.insert(0, REPO); os.chdir(REPO)

@@ -6,7 +6,7 @@
 | parent | — (ilk baseline) |
 | backlog maddesi | — (ilk baseline, keşif değil) |
 | keşif mi | hayır |
-| koşu yeri | Google Colab, Tesla T4 15,6 GB (Kaggle'a hiçbir şey gönderilmedi — K-01) |
+| koşu yeri | Google Colab, **A100-SXM4-80GB (85,1 GB, 12 vCPU)** (Kaggle'a gönderim yok — K-01) |
 | kod | `experiments/EXP-001/code.py` |
 | repo | Peterande/D-FINE @ `956d1709314c2c6a4df6f34de232054578a7449f` (sabitlendi) |
 | durum | **SMOKE geçti · tam koşu başladı, sonuç bekleniyor** |
@@ -25,8 +25,14 @@
   960'ın belirgin üstüne çıkar, T4 15,6 GB'ta OOM riski; baseline tek değişkenli kalsın · sızıntı: yok.
 - **Augmentasyon repo varsayılanı** (PhotometricDistort + ZoomOut + IoUCrop + HFlip), son 7 epoch kapalı ·
   neden: baseline sade kalsın · sızıntı: yok.
-- **LR sqrt ölçekleme:** repo S tarifi batch 64 / lr 4e-4 → batch 8'de lr 1,414e-4, backbone 7,07e-5 ·
+- **LR sqrt ölçekleme:** repo S tarifi batch 64 / lr 4e-4 → batch 32'de lr 2,828e-4, backbone 1,414e-4 ·
   **ÖLÇÜLMEDİ**, bu veride sınanmadı.
+- **Batch 32** (A100 80 GB'ta 64+ sığardı) · neden: epoch süresi batch'e değil görüntü sayısına bağlı;
+  batch küçük tutmak epoch'u yavaşlatmadan optimizer adımını 80'den 161'e çıkarır. 5175 görüntülük
+  sıfırdan eğitimde adım sayısı değerli · sızıntı: yok.
+- **Warmup adım sayısına bağlı** (2 × adım/epoch = 322 iter) · neden: warmup İTERASYON cinsinden
+  (`det_engine.py:119`) ve `lr_scheduler` warmup bitene kadar hiç adımlamıyor (`det_solver.py:94`).
+  Sabit 1000 yazılsaydı batch 32'de 6,2 epoch, batch 48'de 9,3 epoch warmup olurdu · sızıntı: yok.
 - **AMP (fp16)** · neden: T4 bellek/hız · sızıntı: yok.
 - **Val = D-01 sabit bölmesi** (%20 stratified, seed 42) · sızıntı: train/val görüntü kesişimi
   koşuda zorunlu kontrol ediliyor, ölçüldü = 0.
@@ -55,6 +61,13 @@ Kategori sırası `[(0,car),(1,van),(2,truck),(3,bus)]` doğrulandı. train∩va
 - AP50 epoch 0 = 0,0000 · epoch 1 = 0,0010 (2 epoch rastgele başlangıçtan; beklenen).
 - KX RESULT bloğu bu koşuda üretilmedi — hücre 4 çalıştırılmadı (smoke'un amacı kurulum+eğitim yolu).
 
+## T4 kısmi koşusu (iptal edildi, arşivlendi)
+Tam veriyle 1 epoch koştu: **AP50 = 0,0077** · AP50:95 = 0,0029 (repo içi, maxDets=100).
+Loss 29,70 → 23,68. Süre 28,0 dk/epoch → 60 epoch 28,0 sa; iki günlük yarışmaya sığmadı.
+İnsan A100 + yüksek RAM'e geçti. **Devam edilmedi, sıfırdan başlatıldı** — batch 8→32 ve LR
+birlikte değiştiği için devam eden koşu "1 epoch batch 8 + 59 epoch batch 32" olurdu:
+tekrarlanamaz ve EXP-002 gürültü ikizi (K-09) üretilemez. Arşiv: `dfine_runs/EXP-001_t4_kismi_*`.
+
 ### Ölçülen hız (T4, batch 8, 960, sıfırdan)
 | kaynak | eğitim sn/adım | not |
 |---|---|---|
@@ -63,11 +76,13 @@ Kategori sırası `[(0,car),(1,van),(2,truck),(3,bus)]` doğrulandı. train∩va
 | val | 0,5382 | smoke ölçümü |
 | GPU bellek | 6927 / 15360 MiB | batch 16'ya yer var, denenmedi |
 
-**Tam koşu (ölçülen 1,708 sn/adım × 646 adım):** 18,4 dk eğitim + ~1,5 dk val = **19,9 dk/epoch**.
-30 ep ≈ 10,0 sa · 40 ep ≈ 13,3 sa · **60 ep ≈ 19,9 sa** · 220 ep (repo sıfırdan tarifi) ≈ 73 sa.
+**T4'te gerçekleşen (gözlem, ekstrapolasyon değil): epoch 0 baştan sona 28,0 dk** → 60 ep = 28,0 sa.
+Bellek zirvesi 7,28 GB / 15,4 GB.
 
-> Smoke'tan yapılan ilk tahmin (11,3 sa) **yanlıştı**; küçük alt kümede dosya önbelleği
-> dataloader maliyetini gizledi. Alt küme hız ölçümü bu boyutta güvenilir değil.
+> Süre tahmini iki kez yukarı revize edildi, ikisi de küçükten büyüğe ekstrapolasyondan:
+> 11,3 sa (smoke'tan; 256 görüntü OS önbelleğine sığdı, dataloader gizlendi) → 19,9 sa
+> (adım süresinden; val maliyeti 128 görüntülük smoke'tan alındığı için düşük çıktı) →
+> **28,0 sa (ölçülen tam epoch)**. Ders: alt kümeden süre ekstrapole etme.
 
 ### Dataloader darboğazı (ölçüldü)
 Veri: 6469 JPEG, 1,5 GB toplam, ortalama 0,24 MB, kaynak çözünürlük 1360×765 … 2000×1500.
@@ -86,6 +101,10 @@ Colab T4 runtime'ı **2 vCPU** veriyor, RAM 12 GB (7 GB önbellek boşta → dis
    `precision` dizisinden hesaplanıyor.
 5. **SMOKE alt kümesi ilk N görüntüydü** → sınıf dengesi garantisiz. Sabit seed'li, her sınıftan
    en az 5 görüntü garantili örneklemeye çevrildi (ölçüldü: 4 sınıf da var).
+6. **Sabit `warmup_duration: 1000`** — A100'e geçip batch büyüyünce adım/epoch 646'dan 161'e
+   düştü, 1000 iter 6,2 epoch warmup demek olurdu (batch 48'de 9,3). Repoda doğrulandı: warmup
+   iterasyon cinsinden adımlanıyor ve `lr_scheduler` warmup bitene kadar hiç adımlamıyor.
+   Artık `2 × adım/epoch` ve bütçenin %10'unu aşarsa `assert` düşüyor.
 
 ## Riskler (ölçülebilir, koşuyu geçersiz kılmaz)
 - **En iyi checkpoint AP50:95'e göre seçiliyor** (`src/solver/det_solver.py`), ana skorumuz AP50.
