@@ -18,41 +18,35 @@ Colab'da koşan: EXP-001 (T4) · Kaggle'da koşan: yok (K-01)
 
 ## Bu oturumda ne oldu
 - **D-05 (insan): Objects365 ağırlığı YASAK** → EXP-001 sıfırdan eğitime çevrildi, model M→S.
-- **Codex Çağrı 1 + 1b koştu.** 1b dört "GEÇERSİZ KILAR" verdi; hepsi Colab'daki gerçek repoda
-  doğrulandı ve düzeltildi. Taslakta bulunup düzeltilenler:
-  `epoches`→`epochs` (yoksa 60 değil config varsayılanı 220 epoch koşardı) ·
-  `HGNetv2.pretrained` repo varsayılanı `True` → "sıfırdan" config bile ImageNet indirirdi,
-  **D-03 ihlali**, artık `assert` · `pgrep -f 'train.py -c'` kendi kabuğunu eşleştiriyordu
-  (hep "ÇALIŞIYOR") · `ev.stats[0]` maxDets=300'de −1 döner · SMOKE ilk-N → sınıf garantili
-  örnekleme · 640→960 regex yerine yapılandırılmış override + DOĞRULA assert'leri.
+- **Codex Çağrı 1 + 1b koştu;** 1b dört "GEÇERSİZ KILAR" verdi, hepsi gerçek repoda doğrulanıp
+  düzeltildi: `epoches`→`epochs` (yoksa 220 epoch koşardı) · `HGNetv2.pretrained` varsayılanı `True`
+  → "sıfırdan" config bile ImageNet indirirdi (**D-03 ihlali**), artık `assert` · `pgrep` kendi
+  kabuğunu eşleştiriyordu (hep "ÇALIŞIYOR") · `ev.stats[0]` maxDets=300'de −1 · SMOKE ilk-N →
+  sınıf garantili örnekleme · 640→960 regex yerine yapılandırılmış override + DOĞRULA assert'leri.
 - **GPU: Tesla T4 15,6 GB, 2 vCPU, 12 GB RAM.** Bellek 6,9/15,4 GB → batch 16'ya yer var, denenmedi.
-- **SMOKE geçti** (256/128, 2 epoch): DOĞRULA tam — num_classes 4, 960 üç yerde, pretrained False.
-- **Tam koşu başladı:** D-FINE-S sıfırdan, 960, batch 8, 60 ep, lr 1,414e-4 (sqrt ölçekleme).
-- **Süre düzeltmesi:** smoke'tan çıkan 11,3 sa **YANLIŞTI**. Gerçek: 1,708 sn/adım → 19,9 sa.
-  256 görüntü OS önbelleğine sığdığı için alt küme ölçümü dataloader maliyetini gizledi.
-- **Dataloader darboğazı ölçüldü:** adımın %40'ı veri beklemesi (`data: 0,68`). 6469 JPEG, 1,5 GB,
-  kaynak 1360×765…2000×1500. Disk I/O değil — JPEG çözme + resize + augmentasyon, 2 vCPU tavan.
-- **TPU: hayır.** D-FINE saf PyTorch/CUDA; DETR ailesi değişken kutu sayısı + Hungarian eşleştirme
-  kullanır, XLA sabit şekil ister → her adımda yeniden derleme. Port maliyeti günler.
-- **Codex modeli:** `gpt-6-sol` bu hesapta yok (`~/.codex/config.toml` varsayılanı — yazım hatası,
-  `gpt-5.6-sol` olacak). Kullanılabilir: `gpt-6-astra`, `gpt-5.6-sol/terra/luna`, `gpt-5.5`.
-- Parmak izi doğrulandı: train 5175/132.989 `3214f3fa7f9abfe8` · val 1294/32.343 `209e9c83a27b935c` ·
-  kesişim 0. `maxDets=300` gerekçesi düzeltildi: COCO sınırı görüntü**×sınıf** başına, val'de 7 çift aşıyor.
+- **SMOKE geçti** (256/128, 2 ep): DOĞRULA tam. **Tam koşu başladı:** D-FINE-S sıfırdan, 960, batch 8,
+  60 ep, lr 1,414e-4 (sqrt ölçekleme).
+- **Süre düzeltmesi:** smoke'tan çıkan 11,3 sa **YANLIŞTI**; gerçek 1,708 sn/adım → 19,9 sa. 256 görüntü
+  OS önbelleğine sığdığı için alt küme ölçümü dataloader maliyetini gizledi — alt kümeyle hız ölçme.
+- **Dataloader darboğazı:** adımın %40'ı veri beklemesi (`data: 0,68`); 6469 JPEG, 1,5 GB, kaynak
+  1360×765…2000×1500. Disk I/O değil — JPEG çözme + resize + augmentasyon, 2 vCPU tavan.
+- **TPU: hayır.** D-FINE saf PyTorch/CUDA; DETR değişken kutu sayısı + Hungarian → XLA sabit şekil
+  ister, her adımda yeniden derler. **Codex modeli:** `gpt-6-sol` hesapta yok (config.toml yazım
+  hatası); kullanılabilir `gpt-6-astra`, `gpt-5.6-sol/terra/luna`, `gpt-5.5`.
+- Parmak izi: train 5175/132.989 `3214f3fa7f9abfe8` · val 1294/32.343 `209e9c83a27b935c` · kesişim 0.
+  `maxDets=300` gerekçesi düzeltildi: COCO sınırı görüntü**×sınıf** başına, val'de 7 çift aşıyor.
 
 ## Önceki oturum
-- D-01 (CV %80/%20 stratified seed 42), D-02 (koşuyu ajan yapar), D-03 (dış veri yasak), D-04.
-- EDA bitti, split JSON yazıldı, zip Drive'a yüklendi, Colab MCP kuruldu.
+- D-01…D-04 alındı; EDA bitti, split JSON + zip hazır, Colab MCP kuruldu.
 - Ana EDA bulgusu: kutuların %38'i <32² → 960-1280 giriş gerekli, 640 yetmez.
 
 ## Öncesi
-- Resmi PDF; Aşama 1 = drone araç tespiti, mAP@0.5, 4 sınıf; 5/gün, toplam 10, final 2.
-- Kurulum ve prova (K-01…K-09), `test_kx.py` 45/45.
+- Resmi PDF (mAP@0.5, 4 sınıf, 5/gün, toplam 10, final 2); kurulum ve prova K-01…K-09.
 
 ## Sabitlenen kararlar
-- K-01…K-09 (`log/DECISIONS.md`): Kaggle'a gönderim yok · her koşu kendi onayı · zorunlu submission
-  yok · tek ortak hesap · fold parmak izi · gürültü tabanı.
-- D-00: 200 px² altı hedeflenmez (çıktıda filtrelenmiyor, oranı ölçülüyor). D-01: tek bölme, ana skor
-  val mAP@0.5. D-02: koşuyu ajan yapar. D-03: dış veri yasak. **D-05: sıfırdan eğitim.**
+- K-01…K-09: Kaggle'a gönderim yok · her koşu kendi onayı · zorunlu submission yok · gürültü tabanı.
+- D-00: 200 px² altı hedeflenmez (filtrelenmiyor, oranı ölçülüyor) · D-01: tek bölme, ana skor val
+  mAP@0.5 · D-02: koşuyu ajan yapar · D-03: dış veri yasak · **D-05: sıfırdan eğitim.**
 
 ## Denendi, işe yaramadı
 - (yok — ilk baseline henüz bitmedi)
@@ -60,8 +54,8 @@ Colab'da koşan: EXP-001 (T4) · Kaggle'da koşan: yok (K-01)
 ## Aktif riskler
 - **Süre bütçesi çakışıyor:** EXP-001 19,9 sa + EXP-002 19,9 sa ≈ 40 sa, yarışma iki gün.
 - **60 epoch = repo sıfırdan tarifinin %27'si** → eksik eğitim. LR milestone 51'de düşüyor; uzatmak bedava değil.
-- **`kx.py kayit` koşturulamıyor:** altyapı tablo şemasında (`cv_spec.md` boş, `main_score: cv_mean`,
-  `fold_scores` bekleniyor). EXP-001 elle `card.md` + `RUNS.md`'de.
+- **`kx.py kayit` koşturulamıyor:** altyapı tablo şemasında (`cv_spec.md` boş, `fold_scores` bekleniyor);
+  EXP-001 elle `card.md` + `RUNS.md`'de.
 - **Yakın-kopya sızıntısı dışlanmadı** (Codex Çağrı 1). D-01 değişmiyor (kural 1), kontrol backlog'a.
 - **Skor "geçici yerel AP50"** — resmi scorer'ın interpolasyon/sınır/ignore davranışı bilinmiyor.
 - **En iyi checkpoint AP50:95'e göre seçiliyor**, ana skor AP50. Çakışmayabilir, ölçülmedi.
@@ -73,5 +67,4 @@ Colab'da koşan: EXP-001 (T4) · Kaggle'da koşan: yok (K-01)
 3. —
 
 ## Yarışma öncesi kontrol listesi
-- [ ] Kaggle Data/Rules okundu, ENGEL satırları kapandı
-- [x] Colab GPU tipi ölçüldü (T4 15,6 GB, 2 vCPU) · [x] D-01 split + parmak izi koşuda doğrulanıyor
+- [ ] Kaggle Data/Rules · [x] GPU ölçüldü (T4, 2 vCPU) · [x] D-01 split + parmak izi doğrulanıyor
