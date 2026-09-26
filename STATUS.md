@@ -15,7 +15,7 @@ Colab'da koşan: yok · Kaggle'da koşan: yok (K-01)
 
 ## Sıradaki 3 iş
 1. EXP-002 gürültü koşusu (`SEED=1`) — 4,5 sa, onay bekliyor
-2. OOF hata analizi + Codex Çağrı 4 → `log/BACKLOG.md` doldur
+2. Codex Çağrı 4 (fikir üretimi) → `log/BACKLOG.md` doldur — hata analizi girdi olarak hazır
 3. ✋Onay 2 (baseline + gürültü tabanı + hata analizi + dolu backlog, tek pakette)
 
 ## EXP-001 sonucu (ana hat) — ayrıntı `experiments/EXP-001/card.md`
@@ -23,9 +23,18 @@ Colab'da koşan: yok · Kaggle'da koşan: yok (K-01)
 AP50@100 = 0,59206 · 60/60 epoch, 268 dk, ckpt `best_stg2.pth` (ep 59).
 Kurulum: D-FINE-S sıfırdan, 960, batch 32, lr 2,828e-4, A100-80GB.
 **Sınıf başına AP50: car 0,820 · bus 0,624 · van 0,527 · truck 0,409.**
-→ **Tek bulgu:** truck car'ın yarısı — ama bus yalnız %3,1 kutuyla 0,624 alıyor. Sorun örnek
-sayısı değil, **truck/van/car ayrımı**. Bir sonraki deneyi bu belirlemeli.
 Eğri son 10 ep'ta +0,0014/ep → doymuş. maxDets 300↔100 farkı 0,0031. 200 px² altı tahmin %2,3.
+**Gönderilmedi** (K-01/K-04); `log/SUBMISSIONS.md` boş kalıyor.
+
+## OOF hata analizi — İKİ AYRI PROBLEM (kod `EXP-001/hata_analizi.py`, matris `card.md`)
+doğru/yanlışsınıf/kaçırma: car %85,7/3,6/10,8 · van %42,8/**43,7**/13,4 · truck %46,1/26,2/**27,7**
+· bus %63,2/21,7/15,1
+1. **van → car: 1.786 kutu (van'ın %39,5'i)**, en büyük köşegen-dışı hücre, asimetrik (ters yön
+   779). **Sınıflandırma** problemi: nesne bulunuyor, kutu doğru, etiket yanlış.
+2. **truck kaçırma %27,7**; küçük (<32²) truck'larda **%35,3** (car'da %19,3).
+   **Tespit/çözünürlük** problemi, sınıflandırma değil.
+mAP sınıfları eşit ağırlıklandırdığı için van+truck skorun yarısını taşıyor → car'ı iyileştirmek
+boşa. Uyarı: eşleştirme açgözlü/sınıf-bağımsız/eşik 0,30, COCO'nun resmisi değil; yön güvenilir.
 
 ## Bu oturumda ne oldu
 - **D-05 (insan): Obj365 ağırlığı YASAK** → sıfırdan eğitim, model M→S.

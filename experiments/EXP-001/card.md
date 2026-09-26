@@ -159,6 +159,48 @@ Colab T4 runtime'ı **2 vCPU** veriyor, RAM 12 GB (7 GB önbellek boşta → dis
    iterasyon cinsinden adımlanıyor ve `lr_scheduler` warmup bitene kadar hiç adımlamıyor.
    Artık `2 × adım/epoch` ve bütçenin %10'unu aşarsa `assert` düşüyor.
 
+## OOF HATA ANALİZİ (26 Eyl) — kod: `hata_analizi.py`
+Sınıf başına AP'nin ayırmadığı şeyi ayırmak için: kayıp **karışıklık** mı, **kaçırma** mı?
+
+**Karışıklık matrisi** (IoU≥0,5, skor≥0,30, sınıf-bağımsız eşleştirme):
+
+| GT \ tahmin | car | van | truck | bus | KAÇIRILDI | toplam |
+|---|---|---|---|---|---|---|
+| car | 20.849 | 779 | 71 | 17 | 2.626 | 24.342 |
+| van | **1.786** | 1.937 | 157 | 34 | 607 | 4.521 |
+| truck | 339 | 155 | 1.141 | 156 | **686** | 2.477 |
+| bus | 28 | 38 | 152 | 634 | 151 | 1.003 |
+
+| sınıf | doğru | yanlış sınıf | kaçırıldı |
+|---|---|---|---|
+| car | %85,7 | %3,6 | %10,8 |
+| van | %42,8 | **%43,7** | %13,4 |
+| truck | %46,1 | %26,2 | **%27,7** |
+| bus | %63,2 | %21,7 | %15,1 |
+
+**Küçük nesne (<32²) kaçırma oranı:** car %19,3 (n=9539) · van %24,1 (n=1699) ·
+**truck %35,3** (n=674) · bus %23,8 (n=256).
+
+### İki ayrı problem, farklı çözüm ister
+1. **van → car (1.786 kutu = van'ın %39,5'i).** Matristeki en büyük köşegen-dışı hücre.
+   Asimetrik: ters yön 779. Model şüphede car'a kayıyor — car kutuların %75'i olduğu için beklenir.
+   Bu bir **sınıflandırma** problemi; nesne bulunuyor, kutu doğru, etiket yanlış.
+2. **truck kaçırma %27,7** (car'ın 2,5 katı), küçük truck'larda **%35,3**.
+   Bu bir **tespit/çözünürlük** problemi, sınıflandırma değil.
+
+### Neden skoru bu kadar vuruyor
+mAP@0.5 dört sınıfı eşit ağırlıklandırıyor: van kutuların %14'ü ama skorun %25'i, truck %7,7 ama
+yine %25. car'ı iyileştirmek neredeyse boşa; van/truck doğrudan skor.
+
+### Yöntem uyarısı
+Eşleştirme COCO'nun resmi eşleştirmesi **değil**: açgözlü, GT sırasına göre (güvene göre değil),
+sınıf-bağımsız (karışıklığı görebilmek için kasten) ve tek skor eşiği (0,30). Oranlar eşiğe
+duyarlı. Yön güvenilir, ondalıklar yaklaşık. **Skor olarak raporlanmaz, hipotez üretir.**
+
+## Gönderim
+**Gönderilmedi.** K-01 gereği Kaggle'a hiçbir şey gönderilmiyor; K-04 gereği akışta zorunlu
+submission yok. `log/SUBMISSIONS.md` boş kalıyor. Bu koşu yalnız yerel ölçüm zemini.
+
 ## Riskler (ölçülebilir, koşuyu geçersiz kılmaz)
 - **En iyi checkpoint AP50:95'e göre seçiliyor** (`src/solver/det_solver.py`), ana skorumuz AP50.
   En iyi AP50 epoch'uyla çakışmayabilir. Ölçülmedi.
