@@ -20,32 +20,24 @@ Colab'da koşan: yok · Kaggle'da koşan: yok (K-01)
 
 ## EXP-001 sonucu (ana hat) — ayrıntı `experiments/EXP-001/card.md`
 **AP50 = 0,59512** (geçici yerel, COCO maxDets=300, 4 sınıf ort.) · AP50:95 = 0,42258 ·
-AP50@100 = 0,59206 · 60/60 epoch, 268 dk, ckpt `best_stg2.pth` (epoch 59).
+AP50@100 = 0,59206 · 60/60 epoch, 268 dk, ckpt `best_stg2.pth` (ep 59).
 Kurulum: D-FINE-S sıfırdan, 960, batch 32, lr 2,828e-4, A100-80GB.
-
 **Sınıf başına AP50: car 0,820 · bus 0,624 · van 0,527 · truck 0,409.**
 → **Tek bulgu:** truck car'ın yarısı — ama bus yalnız %3,1 kutuyla 0,624 alıyor. Sorun örnek
 sayısı değil, **truck/van/car ayrımı**. Bir sonraki deneyi bu belirlemeli.
-
-Eğri son 10 epoch'ta +0,0014/epoch → doymuş. maxDets 300↔100 farkı yalnız 0,0031
-(gerekçe doğruydu, etkisi gürültü mertebesinde). 200 px² altı tahmin %2,3, filtrelenmedi.
+Eğri son 10 ep'ta +0,0014/ep → doymuş. maxDets 300↔100 farkı 0,0031. 200 px² altı tahmin %2,3.
 
 ## Bu oturumda ne oldu
 - **D-05 (insan): Obj365 ağırlığı YASAK** → sıfırdan eğitim, model M→S.
-- **Codex Çağrı 1 + 1b** koştu; bulguları gerçek repoda doğrulandı. Düzeltilen kod hataları:
-  `epoches`→`epochs` (yoksa 220 epoch) · `HGNetv2.pretrained` varsayılanı `True` → "sıfırdan"
-  config bile ImageNet indirirdi (**D-03 ihlali**) · `pgrep` kendi kabuğunu eşleştiriyordu ·
-  `ev.stats[0]` maxDets=300'de −1 · SMOKE ilk-N örneklemesi · 640→960 regex → yapılandırılmış
-  override · `warmup_duration` sabit 1000 iter (batch 32'de 6,2 epoch warmup olurdu) ·
-  KX RESULT kapanış işareti `kx.py`'nin aradığıyla uyuşmuyordu. Hepsi `assert`le korunuyor.
-- **Donanım:** T4 (2 vCPU) 28 dk/epoch, veri beklemesi %40 → 28 sa, sığmadı. İnsan
-  **A100-80GB (12 vCPU)**'ya geçti: 4,5 dk/epoch, veri beklemesi %8, bellek 27,9/85,1 GB.
-  T4'ün 1 epoch'u arşivlendi (`EXP-001_t4_kismi_2149`), devam EDİLMEDİ (batch+LR değişti).
-- **Süre tahminleri üç kez yukarı revize edildi** (11,3→19,9→28,0 sa), hepsi alt kümeden
+- **Codex Çağrı 1 + 1b** koştu; bulguları repoda doğrulandı. Taslakta 7 hata bulunup düzeltildi
+  (tam liste `card.md`): en ağırı `epoches`→`epochs` ve `HGNetv2.pretrained` varsayılanı `True`
+  (sıfırdan config bile ImageNet indirirdi = **D-03 ihlali**). Hepsi artık `assert`le korunuyor.
+- **Donanım:** T4 (2 vCPU) 28 dk/epoch → 28 sa, sığmadı. İnsan **A100-80GB (12 vCPU)**'ya geçti:
+  4,5 dk/epoch. T4'ün 1 epoch'u arşivlendi (`EXP-001_t4_kismi_2149`), devam EDİLMEDİ (batch+LR değişti).
+- **Süre tahmini üç kez yukarı revize edildi** (11,3→19,9→28,0 sa), hepsi alt kümeden
   ekstrapolasyon hatasıydı. **Ders: alt kümeden süre ekstrapole etme, tam epoch ölç.**
 - **Codex modeli:** `gpt-6-sol` hesapta yok (`~/.codex/config.toml` yazım hatası, `gpt-5.6-sol`
-  olmalı). Kullanılabilir: `gpt-6-astra`, `gpt-5.6-sol/terra/luna`, `gpt-5.5`.
-- **TPU uygun değil:** DETR ailesi değişken kutu sayısı + Hungarian → XLA sabit şekil ister.
+  olmalı). **TPU uygun değil:** DETR değişken kutu sayısı + Hungarian → XLA sabit şekil ister.
 
 ## Önceki oturum
 - D-01…D-04; EDA bitti, split JSON + zip hazır, Colab MCP kuruldu.
@@ -71,8 +63,8 @@ Eğri son 10 epoch'ta +0,0014/epoch → doymuş. maxDets 300↔100 farkı yalnı
   düşüşü mü erken geldi — ölçülmedi.
 - **Yakın-kopya sızıntısı dışlanmadı** (Codex Çağrı 1). D-01 değişmiyor (kural 1), kontrol backlog'a.
 - **Skor "geçici yerel AP50"** — resmi scorer'ın interpolasyon/sınır/ignore davranışı bilinmiyor.
-- **En iyi checkpoint AP50:95'e göre seçiliyor**, ana skor AP50. Çakışmayabilir, ölçülmedi.
-- Colab kopabilir (checkpoint Drive'da) · Evren verisi–Kaggle train ilişkisi bilinmiyor.
+- En iyi ckpt AP50:95'e göre seçiliyor (ana skor AP50) · Colab kopabilir (ckpt Drive'da) ·
+  Evren verisi–Kaggle train ilişkisi bilinmiyor.
 
 ## Ürüne taşınabilecek en güçlü 3 bulgu
 1. **truck/van ayrımı zayıf** (0,409 / 0,527 vs car 0,820) ve bu örnek sayısından değil — ölçüldü.
