@@ -9,7 +9,7 @@
 | koşu yeri | Google Colab, **A100-SXM4-80GB (85,1 GB, 12 vCPU)** (Kaggle'a gönderim yok — K-01) |
 | kod | `experiments/EXP-001/code.py` |
 | repo | Peterande/D-FINE @ `956d1709314c2c6a4df6f34de232054578a7449f` (sabitlendi) |
-| durum | **A100'de koşuyor** — epoch 1/60, 4,5 dk/epoch, tahmini bitiş 4,5 sa |
+| durum | **BİTTİ** — 60/60 epoch, 268 dk. Ana skor **AP50 = 0,59512** |
 
 ## Dört satır
 - **Hangi backlog maddesi:** — (ilk baseline)
@@ -60,6 +60,41 @@ Kategori sırası `[(0,car),(1,van),(2,truck),(3,bus)]` doğrulandı. train∩va
 - Model 10,18 M parametre, 52,46 GFLOPS (ileri, 960).
 - AP50 epoch 0 = 0,0000 · epoch 1 = 0,0010 (2 epoch rastgele başlangıçtan; beklenen).
 - KX RESULT bloğu bu koşuda üretilmedi — hücre 4 çalıştırılmadı (smoke'un amacı kurulum+eğitim yolu).
+
+## SONUÇ (60/60 epoch, A100, 268 dk)
+
+| metrik | değer |
+|---|---|
+| **ana skor — geçici yerel AP50 (maxDets=300)** | **0,59512** |
+| AP50, maxDets=100 | 0,59206 |
+| AP50:95 (maxDets=300) | 0,42258 |
+| checkpoint | `best_stg2.pth`, epoch 59 |
+| tahmin sayısı | 388.200 kutu / 1294 görüntü (görüntü başı tam 300 = D-FINE sorgu sayısı) |
+
+### Sınıf başına AP50 — bir sonraki deneyi belirleyen bulgu
+| sınıf | AP50 | val kutu payı |
+|---|---|---|
+| car | **0,8195** | %75,3 |
+| bus | 0,6242 | %3,1 |
+| van | 0,5273 | %14,0 |
+| truck | **0,4094** | %7,7 |
+
+**Tek bulgu:** truck (0,409) car'ın (0,820) yarısı. Ve bu saf sınıf dengesizliği değil —
+bus yalnız %3,1 kutuya sahip ama 0,624 alıyor, truck %7,7 ile 0,409'da. Yani sorun örnek
+sayısı değil, **truck/van/car ayrımı** görünüyor. Backlog'a bu gözlemle girer.
+
+### maxDets kararı geriye dönük değerlendirme
+maxDets 300 ile 100 arasındaki fark yalnız **0,0031** (0,59512 vs 0,59206). Kararın gerekçesi
+doğruydu (val'de 7 görüntü–sınıf çifti 100'ü aşıyor) ama etkisi gürültü mertebesinde çıktı.
+
+### D-00 ölçümü
+200 px² altı tahmin: 9081 / 388.200 = **%2,3**. Filtrelenmedi. Resmi kuralın bunları nasıl
+saydığı bilinmiyor; filtrelemenin etkisi ölçülmedi, backlog maddesi.
+
+### Eğitim eğrisi (repo içi AP50, maxDets=100)
+epoch 0: 0,005 · 5: 0,144 · 10: 0,265 · 20: 0,427 · 30: 0,508 · 40: 0,557 · 50: 0,580 · 59: 0,593.
+Monoton, tıkanma yok. Son 10 epoch'ta epoch başına +0,0014 → **doymuş**. 51. epoch'taki
+LR ×0,1 düşüşünde ve 53. epoch'ta augmentasyonun kapanmasında beklenen sıçrama **görülmedi**.
 
 ### A100 ölçümü (gözlem, epoch 0 tam)
 | | T4, batch 8 | **A100-80GB, batch 32** |
@@ -116,7 +151,10 @@ Colab T4 runtime'ı **2 vCPU** veriyor, RAM 12 GB (7 GB önbellek boşta → dis
    `precision` dizisinden hesaplanıyor.
 5. **SMOKE alt kümesi ilk N görüntüydü** → sınıf dengesi garantisiz. Sabit seed'li, her sınıftan
    en az 5 görüntü garantili örneklemeye çevrildi (ölçüldü: 4 sınıf da var).
-6. **Sabit `warmup_duration: 1000`** — A100'e geçip batch büyüyünce adım/epoch 646'dan 161'e
+6. **KX RESULT kapanış işareti uyumsuz:** kod `=== END KX RESULT ===` basıyordu,
+   `kx.py` `RESULT_RE` tam olarak `=== KX RESULT SONU ===` arıyor → blok hiç bulunamıyordu.
+   Taslaktan gelen hata, `kayit` denenince ortaya çıktı. Düzeltildi.
+7. **Sabit `warmup_duration: 1000`** — A100'e geçip batch büyüyünce adım/epoch 646'dan 161'e
    düştü, 1000 iter 6,2 epoch warmup demek olurdu (batch 48'de 9,3). Repoda doğrulandı: warmup
    iterasyon cinsinden adımlanıyor ve `lr_scheduler` warmup bitene kadar hiç adımlamıyor.
    Artık `2 × adım/epoch` ve bütçenin %10'unu aşarsa `assert` düşüyor.
@@ -137,10 +175,21 @@ Colab T4 runtime'ı **2 vCPU** veriyor, RAM 12 GB (7 GB önbellek boşta → dis
 - D-00 (200 px² altı) çıktıda **filtrelenmiyor**, yalnız oranı ölçülüp raporlanıyor.
 
 ## Atlanan doğrulama
-- **`python tools/kx.py kayit EXP-001` koşturulamadı.** Altyapı hâlâ tablo şemasında:
-  `core/cv_spec.md` boş (D-01'de doldurulmamış), `kx.json` `main_score: "cv_mean"`, `validate_output`
-  `fold_scores` / `cv_oof` / `fold_fingerprint` bekliyor. Tespit sonucu bu sözleşmeye uymuyor
-  (tek holdout, fold yok, ana skor AP50). `case/CASE.md`'deki insan kararı: altyapı case'e göre
-  yeniden kurulacak. Bu yapılana kadar EXP-001 sonucu `card.md` + `log/RUNS.md`'de elle tutuluyor.
+- **`python tools/kx.py kayit EXP-001` KOŞTURULDU ve REDDETTİ.** Tahmin değil, ölçülen çıktı:
+  ```
+  DOGRULAMA BASARISIZ - sonuc kayda GIRMEDI:
+    - result.json: 'exp_id' alani yok
+    - result.json: 'cv_mean' alani yok
+    - result.json: 'cv_oof' alani yok
+    - result.json: 'fold_scores' alani yok
+    - result.json: 'n_folds_done' alani yok
+    - result.json: 'mode' alani yok (FAST/FULL ayrimi yapilamaz)
+  ```
+  Sebep: doğrulayıcı tablo şeması bekliyor, tespit sonucu tek holdout (fold yok).
+  `core/cv_spec.md` hâlâ BOŞ — D-01'de doldurulmamış, yani uyulacak bir çıktı sözleşmesi yok.
+  EXP-001 sonucu `card.md` + `log/RUNS.md` + `EXP_SUMMARY.md`'ye **elle** yazıldı.
+  **İnsan kararı bekliyor:** tek holdout'u `fold_scores=[AP50]`, `n_folds_done=1`,
+  `cv_mean=cv_oof=AP50`, `mode="FULL"` diye eşlemek sözleşmeyi açar ve `cmp` gürültü tabanıyla
+  (K-09) çalışır. Bu eşlemeyi tek başıma yapmadım; `cv_spec.md` D-01 artefaktı.
 - `tools/adv_val.py` (test-ayrım kanıtı) koşturulmadı — tablo varsayıyor, Kaggle test seti de yok.
 - Ürün etkisi notu: model çıktısı kutu merkezi koruyor (Aşama 2 piksel→koordinat için gerekli), ölçülmedi.

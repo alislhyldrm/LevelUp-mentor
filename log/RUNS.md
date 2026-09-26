@@ -8,7 +8,7 @@ Kodu insana vermeden önce `python tools/kx.py board` bak.
 |---|---|---|---|---|---|
 | EXP-001_smoke | Claude/Colab | 25 Eyl | T4 | — | **bitti** — 2/2 epoch, 2:05. Boru hattı testi; skor karşılaştırmasına girmez |
 | EXP-001 (T4, iptal) | Claude/Colab | 25 Eyl | T4 | — | **iptal** — 1 epoch (AP50 0,0077), 28 dk/ep = 28 sa, sığmadı. Arşiv: `EXP-001_t4_kismi_2149` |
-| EXP-001 (tam) | Claude/Colab | 26 Eyl | **A100-80GB** | **4,5 sa** (60 ep × 4,5 dk, ölçüldü) | **koşuyor** |
+| EXP-001 (tam) | Claude/Colab | 26 Eyl | **A100-80GB** | — | **bitti** — 60/60 epoch, 268 dk, AP50 **0,59512** |
 
 ## Kurallar
 - GPU gerektirmeyen her şey **CPU'da koşar** (tablo/GBDT dahil). GPU kotası derin

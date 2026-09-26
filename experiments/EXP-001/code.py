@@ -387,6 +387,6 @@ print(json.dumps({
     "val_images": len(ids), "n_dets": len(dets), "dets_under_200px2": kucuk,
     "split": "D-01 seed42 %20 stratified", "fingerprint": {k: FP[k]["sha16"] for k in FP},
 }, ensure_ascii=False, indent=1))
-print("=== END KX RESULT ===")
+print("=== KX RESULT SONU ===")   # kx.py RESULT_RE tam bu iareti ariyor
 json.dump(dets, open(f"{RUN_DIR}/val_dets.json", "w"))
 print("tahminler kaydedildi:", f"{RUN_DIR}/val_dets.json")
