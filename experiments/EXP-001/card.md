@@ -201,6 +201,24 @@ duyarlı. Yön güvenilir, ondalıklar yaklaşık. **Skor olarak raporlanmaz, hi
 **Gönderilmedi.** K-01 gereği Kaggle'a hiçbir şey gönderilmiyor; K-04 gereği akışta zorunlu
 submission yok. `log/SUBMISSIONS.md` boş kalıyor. Bu koşu yalnız yerel ölçüm zemini.
 
+## Ağırlıklar ve disk (26 Eyl)
+Korunan: `dfine_runs/EXP-001/` → `best_stg2.pth` (165,5 MB, **epoch 59, skorlanan model**) ·
+`best_stg1.pth` · `last.pth` · `val_dets.json` (145,6 MB, kural 5: tahmin silinmez) · loglar.
+**Ağırlıklar git'te değil, yalnız Drive'da** — Aşama 2 agent'ı bu dedektörü kullanacak.
+
+**Silinen:** 53 × `checkpointNNNN.pth` = **8,77 GB** (insan onayıyla). `dfine_runs` 11 GB → 2,1 GB.
+Analitik değerleri yoktu: kayıtta AP50 epoch 59'a kadar monoton arttı, yani en iyi AP50 epoch'u
+zaten son epoch ve `best_stg2.pth` onu tutuyor.
+
+**Bu israf bir kod hatasıydı:** `checkpoint_freq` taslakta 1000'ken 1'e çekilmişti, gerekçe
+"oturum koparsa devam". Ama `last.pth` zaten her epoch **koşulsuz** yazılıyor
+(`src/solver/det_solver.py:100`); `checkpoint_freq` yalnız numaralı kopyaları üretiyor.
+Kodda 1000'e geri alındı. Değiştirmeden önce repo okunmalıydı.
+
+### Kapanan risk
+"En iyi checkpoint AP50:95'e göre seçiliyor, ana skorumuz AP50, çakışmayabilir" riski
+**kapandı**: AP50 monoton arttığı için iki ölçütün en iyisi aynı epoch (59).
+
 ## Riskler (ölçülebilir, koşuyu geçersiz kılmaz)
 - **En iyi checkpoint AP50:95'e göre seçiliyor** (`src/solver/det_solver.py`), ana skorumuz AP50.
   En iyi AP50 epoch'uyla çakışmayabilir. Ölçülmedi.

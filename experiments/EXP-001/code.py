@@ -200,7 +200,10 @@ exp_cfg = {
                                        # config varsayılanı (S için 220) koşar — taslaktaki hata buydu.
     "seed": SEED,
     "eval_spatial_size": [IMG, IMG],
-    "checkpoint_freq": 1,              # her epoch last.pth → oturum koparsa Drive'dan devam
+    # `last.pth` ZATEN her epoch koşulsuz yazılıyor (src/solver/det_solver.py:100) — devam
+    # yeteneği için buraya dokunmaya gerek yok. checkpoint_freq yalnız NUMARALI kopyaları
+    # üretir: 1 yapılırsa 60 epoch × 165 MB = 8,8 GB Drive dolar (EXP-001'de yaşandı, silindi).
+    "checkpoint_freq": 1000,           # numaralı kopya yok; last.pth + best_stg* yeterli
     "HGNetv2": {
         "pretrained": PRETRAINED_BACKBONE,   # D-05: dış ağırlık yok
         "freeze_at": -1, "freeze_norm": False,
