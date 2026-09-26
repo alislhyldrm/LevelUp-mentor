@@ -1,9 +1,14 @@
-# EXP-001 — D-FINE-S baseline, SIFIRDAN eğitim (Colab T4, Colab MCP ile koşulur)
+# EXP-001 — D-FINE-S baseline, SIFIRDAN eğitim (Colab, Colab MCP ile koşuldu)
 # Backlog: — (ilk baseline, keşif değil)
 # Hipotez: 960 girişte sıfırdan eğitilmiş D-FINE-S, bu veride ölçülebilir bir mAP@0.5 zemini verir
 # Dayanak: EDA — kutuların %38'i <32², 640'ta p5 kenar ≈ 7 px (case/CASE.md satır 6)
-# Süre: ÖLÇÜLDÜ (smoke, T4). Eğitim 0,912 sn/adım, val 0,538 sn/adım @ batch 8, 960.
-#   → tam koşu 9,8 dk eğitim + 1,5 dk val = 11,3 dk/epoch; 60 epoch ≈ 11,3 sa. Bellek 6,9/15,4 GB.
+#
+# SONUÇ (26 Eyl, koşuldu): ana skor **geçici yerel AP50 = 0,59512** (COCO maxDets=300, 4 sınıf ort.)
+#   AP50:95 = 0,42258 · AP50@100 = 0,59206 · ckpt best_stg2.pth (epoch 59) · 60/60 epoch, 268 dk
+#   Sınıf başına AP50: car 0,820 · bus 0,624 · van 0,527 · truck 0,409
+# SÜRE (A100-SXM4-80GB, 12 vCPU, batch 32): 4,5 dk/epoch, ~1,05 sn/adım, bellek 27,9/85,1 GB.
+#   T4 (2 vCPU, batch 8) ile aynı koşu 28,0 dk/epoch idi — darboğaz GPU değil vCPU'ydu
+#   (veri beklemesi T4'te %40, A100'de %8). Ayrıntı: card.md.
 #
 # TEKNIKLER
 # - D-FINE-S / HGNetv2-B0, **sıfırdan** (rastgele başlatma) · neden: D-03 dış veri yasağı, D-05
